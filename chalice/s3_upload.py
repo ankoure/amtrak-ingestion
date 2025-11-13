@@ -7,6 +7,28 @@ import os
 import time
 from constants import S3_BUCKET, S3_DATA_TEMPLATE, EASTERN_TIME, LOCAL_DATA_TEMPLATE
 from disk import DATA_DIR
+import json
+
+
+def get_s3_json(bucket_name: str, key: str) -> dict:
+    """
+    Downloads a JSON file from S3 and returns it as a dict.
+    """
+    response = s3_client.get_object(Bucket=bucket_name, Key=key)
+    content = response["Body"].read().decode("utf-8")
+    return json.loads(content)
+
+
+def set_s3_json(data: dict, bucket_name: str, key: str):
+    """
+    Uploads a Python dict as a JSON file to S3.
+    """
+
+    json_bytes = json.dumps(data, indent=2).encode("utf-8")
+
+    s3_client.put_object(
+        Bucket=bucket_name, Key=key, Body=json_bytes, ContentType="application/json"
+    )
 
 
 def service_date(ts: datetime) -> date:

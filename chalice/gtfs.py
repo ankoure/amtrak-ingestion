@@ -7,6 +7,9 @@ following the methodology from TransitMatters/gobble.
 
 import polars as pl
 from pathlib import Path
+import requests
+from datetime import datetime
+from config import s3_client
 
 
 def load_gtfs_stop_times(gtfs_dir: str) -> pl.DataFrame:
@@ -230,3 +233,51 @@ def generate_direction_on_custom_headsign(
         pl.col(headsign_code_col).replace(lookup).alias("direction_id")
     )
     return new_df
+
+
+def get_gtfs_last_modified(url: str) -> datetime | None:
+    """
+    Get the Last-Modified date of a remote GTFS zip file.
+    Args:
+        url (str): The URL of the GTFS feed (zip file).
+    Returns:
+        datetime | None: The last modified date in UTC, or None if unavailable.
+    """
+    try:
+        response = requests.head(url, allow_redirects=True, timeout=10)
+        response.raise_for_status()
+
+        last_modified = response.headers.get("Last-Modified")
+        if last_modified:
+            return datetime.strptime(last_modified, "%a, %d %b %Y %H:%M:%S %Z")
+    except Exception as e:
+        print(f"Error checking GTFS feed: {e}")
+
+    return None
+
+
+def upload_gtfs_bundle(
+    tmp_path: Path,
+    bucket_name: str,
+    s3_key: str,
+):
+    try:
+        s3_client.upload_file(str(tmp_path), bucket_name, s3_key)
+
+        # Optional: get file metadata
+        file_size = tmp_path.stat().st_size
+        return {
+            "bucket": bucket_name,
+            "key": s3_key,
+            "size_bytes": file_size,
+            "message": "GTFS bundle successfully uploaded to S3",
+        }
+
+    except Exception as e:
+        print(f"Error transferring GTFS feed: {e}")
+        raise
+
+    finally:
+        # Clean up temp file
+        if "tmp_path" in locals() and tmp_path.exists():
+            tmp_path.unlink()
