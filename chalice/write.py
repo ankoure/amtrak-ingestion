@@ -1,6 +1,9 @@
 import polars as pl
-from datetime import datetime
-from disk import write_event, service_date
+from datetime import datetime, timezone
+from disk import service_date
+import json
+from s3_upload import _compress_and_upload_file
+import os
 
 
 def calculate_service_date_from_datetime(dt: datetime) -> str:
@@ -48,39 +51,20 @@ def add_service_dates(enriched_df: pl.DataFrame) -> pl.DataFrame:
     return df_with_dates
 
 
-def write_amtraker_events(enriched_df: pl.DataFrame) -> None:
+def write_amtraker_events(enriched_df: pl.DataFrame, mode: str = "amtrak"):
     """
-    Write enriched Amtraker data to CSV files using disk.py utilities.
-
-    Each DataFrame row represents a train at a station with both arrival and departure times.
-    This function splits each row into two events: one for arrival and one for departure.
-
     Args:
         enriched_df: Polars DataFrame with enriched Amtraker data (must include
                      direction_id, scheduled_headway, scheduled_tt, and service_date columns)
-
-    Expected CSV fields (from disk.py):
-        - service_date: From service_date_arr or service_date_dep
-        - route_id: From routeName
-        - trip_id: From trainNumRaw
-        - direction_id: From direction_id
-        - stop_id: From code
-        - stop_sequence: Not available in Amtraker data, set to None
-        - vehicle_id: From trainNumRaw
-        - vehicle_label: From trainNumRaw
-        - event_type: "ARR" or "DEP"
-        - event_time: From arr or dep
-        - scheduled_headway: From scheduled_headway
-        - scheduled_tt: From scheduled_tt
-        - vehicle_consist: Not available, set to None
-        - occupancy_status: Not available, set to None
-        - occupancy_percentage: Not available, set to None
+        mode: Provider name for output directory (e.g., "amtrak", "via", "brightline")
     """
     # Add service_date columns first
     df_with_service_dates = add_service_dates(enriched_df)
 
     # Convert DataFrame to list of dictionaries for easier processing
     records = df_with_service_dates.to_dicts()
+
+    list_of_dicts = []
 
     for record in records:
         # Create arrival event
@@ -106,7 +90,7 @@ def write_amtraker_events(enriched_df: pl.DataFrame) -> None:
                 "scheduled_headway": record.get("scheduled_headway"),
                 "scheduled_tt": record.get("scheduled_tt"),
             }
-            write_event(arrival_event)
+            list_of_dicts.append(arrival_event)
 
         # Create departure event
         dep_time = record.get("dep")
@@ -131,51 +115,14 @@ def write_amtraker_events(enriched_df: pl.DataFrame) -> None:
                 "scheduled_headway": record.get("scheduled_headway"),
                 "scheduled_tt": record.get("scheduled_tt"),
             }
-            write_event(departure_event)
+            list_of_dicts.append(departure_event)
+    json_string = json.dumps(list_of_dicts)
+    date = datetime.now(timezone.utc)
 
+    fname = f"data/raw/{mode}/{date.strftime('Year=%Y/Month=%m/Day=%d/_%H_%M')}.json"
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(fname), exist_ok=True)
 
-if __name__ == "__main__":
-    from read import read_amtraker_data
-    from transform import add_direction_id, add_scheduled_metrics
-    from utils import get_latest_gtfs_archive
-    from constants import AMTRAK_STATIC_GTFS
-
-    # Configure Polars to show all columns
-    pl.Config.set_tbl_cols(-1)
-    pl.Config.set_tbl_width_chars(1000)
-
-    # Get GTFS data
-    gtfs_dir = get_latest_gtfs_archive(AMTRAK_STATIC_GTFS)
-
-    # Read and enrich Amtraker data
-    amtrak_df, via_df, brightline_df = read_amtraker_data()
-
-    # Enrich with direction_id and scheduled metrics
-    enriched_amtrak = add_direction_id(amtrak_df, gtfs_dir)
-    enriched_amtrak = add_scheduled_metrics(enriched_amtrak, gtfs_dir)
-
-    # Add service dates
-    df_with_service_dates = add_service_dates(enriched_amtrak)
-
-    # Show sample with service dates
-    print("\n=== Sample with Service Dates ===")
-    print(
-        df_with_service_dates.select(
-            [
-                "trainNumRaw",
-                "code",
-                "arr",
-                "dep",
-                "service_date_arr",
-                "service_date_dep",
-            ]
-        ).head(10)
-    )
-
-    # Write events to CSV
-    print(f"\nWriting {len(enriched_amtrak)} records to CSV...")
-    print(f"This will create {len(enriched_amtrak) * 2} events (arrival + departure)")
-
-    write_amtraker_events(enriched_amtrak)
-
-    print("Done! Events written to data/ directory")
+    with open(fname, "w") as file:
+        file.write(json_string)
+        _compress_and_upload_file(fname)

@@ -35,7 +35,7 @@ def add_direction_id(amtraker_df: pl.DataFrame, gtfs_dir: str) -> pl.DataFrame:
     df_with_both = df_with_primary.join(
         secondary_lookup.select(
             [
-                pl.col("headsign_stop_id").alias("destCode"),
+                pl.col("headsign_stop_id").cast(pl.Utf8).alias("destCode"),
                 pl.col("direction_id").alias("direction_id_secondary"),
             ]
         ),
@@ -94,7 +94,7 @@ def add_scheduled_metrics(amtraker_df: pl.DataFrame, gtfs_dir: str) -> pl.DataFr
     enriched_df = amtraker_df.join(
         gtfs_aggregated.select(
             [
-                pl.col("stop_id").alias("code"),
+                pl.col("stop_id").cast(pl.Utf8).alias("code"),
                 "direction_id",
                 "scheduled_headway",
                 "scheduled_tt",
@@ -113,58 +113,3 @@ def add_scheduled_metrics(amtraker_df: pl.DataFrame, gtfs_dir: str) -> pl.DataFr
     )
 
     return enriched_df
-
-
-if __name__ == "__main__":
-    from read import read_amtraker_data
-    from utils import get_latest_gtfs_archive
-    from constants import AMTRAK_STATIC_GTFS
-
-    # Configure Polars to show all columns
-    pl.Config.set_tbl_cols(-1)  # Show all columns
-    pl.Config.set_tbl_width_chars(1000)  # Wider table
-
-    # Get GTFS data
-    gtfs_dir = get_latest_gtfs_archive(AMTRAK_STATIC_GTFS)
-
-    # Read Amtraker data
-    amtrak_df, via_df, brightline_df = read_amtraker_data()
-
-    # Enrich with direction_id first
-    enriched_amtrak = add_direction_id(amtrak_df, gtfs_dir)
-
-    # Then add scheduled metrics
-    enriched_amtrak = add_scheduled_metrics(enriched_amtrak, gtfs_dir)
-
-    # Display results - show all columns
-    print("\n=== Enriched Amtrak Data (All Columns) ===")
-    print(f"Total columns: {len(enriched_amtrak.columns)}")
-    print(f"Columns: {enriched_amtrak.columns}")
-    print(f"\nTotal Amtrak records: {len(enriched_amtrak)}")
-    print("\nFull DataFrame:")
-    print(enriched_amtrak)
-
-    # Summary statistics
-    print("\n=== Enrichment Summary ===")
-    print(
-        f"Primary lookups: {enriched_amtrak.filter(pl.col('lookup_method') == 'primary').height}"
-    )
-    print(
-        f"Secondary lookups: {enriched_amtrak.filter(pl.col('lookup_method') == 'secondary').height}"
-    )
-    print(
-        f"No match: {enriched_amtrak.filter(pl.col('lookup_method').is_null()).height}"
-    )
-
-    records_with_metrics = enriched_amtrak.filter(
-        pl.col("scheduled_headway").is_not_null() & pl.col("scheduled_tt").is_not_null()
-    )
-    records_missing_metrics = enriched_amtrak.filter(
-        pl.col("scheduled_headway").is_null() | pl.col("scheduled_tt").is_null()
-    )
-    print(
-        f"Records with both scheduled metrics: {records_with_metrics.height} ({records_with_metrics.height / len(enriched_amtrak) * 100:.1f}%)"
-    )
-    print(
-        f"Records missing scheduled metrics: {records_missing_metrics.height} ({records_missing_metrics.height / len(enriched_amtrak) * 100:.1f}%)"
-    )

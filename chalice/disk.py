@@ -3,24 +3,7 @@ import os
 import pathlib
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
-
-
-CSV_FILENAME = "events.csv"
-CSV_FIELDS = [
-    "service_date",
-    "route_id",
-    "trip_id",
-    "direction_id",
-    "stop_id",
-    "stop_sequence",
-    "vehicle_id",
-    "vehicle_label",
-    "event_type",
-    "event_time",
-    "scheduled_headway",
-    "scheduled_tt",
-]
-DATA_DIR = pathlib.Path("data")
+from constants import DATA_DIR, CSV_FIELDS, CSV_FILENAME
 
 
 def service_date(ts: datetime) -> date:
@@ -36,12 +19,11 @@ def service_date(ts: datetime) -> date:
 
 
 def output_dir_path(
-    route_id: str, direction_id: str, stop_id: str, ts: datetime
+    route_id: str, direction_id: str, stop_id: str, ts: datetime, mode: str = "amtrak"
 ) -> str:
     date = service_date(ts)
     delimiter = "_"
     stop_path = f"{route_id}{delimiter}{direction_id}{delimiter}{stop_id}"
-    mode = "amtrak"
 
     return os.path.join(
         f"daily-{mode}-data",
@@ -52,7 +34,7 @@ def output_dir_path(
     )
 
 
-def write_event(event: dict):
+def write_event(event: dict, mode: str = "amtrak"):
     # Convert event_time to datetime if it's a string
     event_time = event["event_time"]
     if isinstance(event_time, str):
@@ -64,6 +46,7 @@ def write_event(event: dict):
             event["direction_id"],
             event["stop_id"],
             event_time,
+            mode,
         )
     )
     dirname.mkdir(parents=True, exist_ok=True)

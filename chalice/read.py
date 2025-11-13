@@ -1,3 +1,4 @@
+from timefilter import filter_events
 from models.amtraker import TrainResponse
 import requests
 from pydantic import ValidationError
@@ -38,8 +39,9 @@ def trainresponse_to_polars(train_response: TrainResponse) -> pl.DataFrame:
     """
     Convert TrainResponse to Polars DataFrame.
 
-    The TrainResponse is a dict mapping train numbers to lists of Train objects.
-    This flattens it into a single DataFrame with one row per train instance.
+    The TrainResponse is a dict mapping train numbers to lists of Train
+    objects. This flattens it into a single DataFrame with one row per
+    train instance.
     """
     # Option 1: Using Pydantic's model_dump() and flattening
     trains_data = []
@@ -92,27 +94,30 @@ def explode_df(polars_df: pl.DataFrame) -> pl.DataFrame:
     df_exploded = df_exploded.unnest("stations")
 
     # Convert timestamp strings to datetime objects
+    # Replace 'Z' with '+00:00' to handle ISO 8601 UTC format (used by Via Rail)
     df_exploded = df_exploded.with_columns(
         [
-            pl.col("arr").str.strptime(
-                pl.Datetime, "%Y-%m-%dT%H:%M:%S%z", strict=False
-            ),
-            pl.col("dep").str.strptime(
-                pl.Datetime, "%Y-%m-%dT%H:%M:%S%z", strict=False
-            ),
-            pl.col("schArr").str.strptime(
-                pl.Datetime, "%Y-%m-%dT%H:%M:%S%z", strict=False
-            ),
-            pl.col("schDep").str.strptime(
-                pl.Datetime, "%Y-%m-%dT%H:%M:%S%z", strict=False
-            ),
+            pl.col("arr")
+            .str.replace("Z", "+00:00")
+            .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%z", strict=False),
+            pl.col("dep")
+            .str.replace("Z", "+00:00")
+            .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%z", strict=False),
+            pl.col("schArr")
+            .str.replace("Z", "+00:00")
+            .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%z", strict=False),
+            pl.col("schDep")
+            .str.replace("Z", "+00:00")
+            .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%z", strict=False),
         ]
     )
 
     return df_exploded
 
 
-def remove_excess_columns_from_stations(polars_df: pl.DataFrame) -> pl.DataFrame:
+def remove_excess_columns_from_stations(
+    polars_df: pl.DataFrame,
+) -> pl.DataFrame:
     new_df = polars_df.drop(
         [
             "name",
@@ -148,7 +153,8 @@ def read_amtraker_data() -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     new_df = remove_excess_fields(df)
     exploded_df = explode_df(new_df)
     cleanup_stations = remove_excess_columns_from_stations(exploded_df)
-    remove_bus_df = remove_bus(cleanup_stations)
+    time_filter = filter_events(cleanup_stations, "dep")
+    remove_bus_df = remove_bus(time_filter)
     return split_df_by_provider(remove_bus_df)
 
 

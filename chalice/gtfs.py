@@ -7,8 +7,6 @@ following the methodology from TransitMatters/gobble.
 
 import polars as pl
 from pathlib import Path
-from utils import get_latest_gtfs_archive
-from constants import AMTRAK_STATIC_GTFS
 
 
 def load_gtfs_stop_times(gtfs_dir: str) -> pl.DataFrame:
@@ -214,5 +212,21 @@ def generate_direction_lookup(GTFS_DIR: str) -> tuple[pl.DataFrame, pl.DataFrame
     return primary_df, secondary_df
 
 
-if __name__ == "__main__":
-    print(calculate_gtfs_metrics(get_latest_gtfs_archive(AMTRAK_STATIC_GTFS)))
+def generate_direction_on_custom_headsign(
+    df: pl.DataFrame, lookup: dict[str, int], headsign_code_col: str = "destCode"
+) -> pl.DataFrame:
+    """
+    Generate Direction IDs based on headsign and lookup. Meant for providers1
+    that don't include direction_id in GTFS bundle (i.e Brightline).
+    Example Mapping:
+    headsign_to_dir = {
+    "North Station": 0,
+    "South Station": 1,
+    "Forest Hills": 1,
+    "Oak Grove": 0
+    }
+    """
+    new_df = df.with_columns(
+        pl.col(headsign_code_col).replace(lookup).alias("direction_id")
+    )
+    return new_df
