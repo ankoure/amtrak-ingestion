@@ -1,5 +1,5 @@
 from chalice import Chalice, Cron
-from chaliceapp.main import check_gtfs_bundle_loop
+from chaliceapp.main import check_gtfs_bundle_loop, generate_event_data
 
 app = Chalice(app_name="test")
 
@@ -12,8 +12,8 @@ def index():
 @app.schedule(Cron(0, 2, "*", "*", "?", "*"))
 def update_gtfs_cache(event):
     """
-    Scheduled function to update GTFS caches in S3
-    Runs daily at 2:00 AM UTC (adjust as needed)
+    Scheduled function to check for and update GTFS bundles in S3
+    Runs daily at 2:00 AM UTC
 
     The Cron format is: Cron(minutes, hours, day_of_month, month, day_of_week, year)
     Current: 0 2 * * ? * = Every day at 2:00 AM UTC
@@ -27,27 +27,32 @@ def manual_gtfs_update():
     Manual endpoint to trigger GTFS cache update
     Useful for testing or forcing an update outside the schedule
     """
-    from chaliceapp.gtfs_cache import update_all_gtfs_caches
+    check_gtfs_bundle_loop()
 
-    results = update_all_gtfs_caches()
-    return {"status": "completed", "results": results}
+    return {"status": "completed"}
 
 
-@app.route("/gtfs/metadata/{provider}")
-def get_gtfs_info(provider):
+@app.schedule(Cron("*/5", "*", "*", "*", "?", "*"))
+def consume_amtraker_api(event):
     """
-    Get metadata about a cached GTFS bundle
+    Scheduled function to fetch train data from Amtraker API and generate events
+    Runs every 5 minutes
 
-    Args:
-        provider: Provider name (amtrak, via_rail, or brightline)
+    The Cron format is: Cron(minutes, hours, day_of_month, month, day_of_week, year)
+    Current: */5 * * * ? * = Every 5 minutes
     """
-    from chaliceapp.gtfs_cache import get_gtfs_metadata
+    generate_event_data()
 
-    metadata = get_gtfs_metadata(provider)
-    if metadata:
-        return metadata
-    else:
-        return {"error": f"No cached GTFS found for provider: {provider}"}, 404
+
+@app.route("/amtraker/update", methods=["POST"])
+def manual_amtraker_update():
+    """
+    Manual endpoint to trigger Amtraker data ingestion
+    Useful for testing or forcing an update outside the schedule
+    """
+    generate_event_data()
+
+    return {"status": "completed"}
 
 
 # The view function above will return {"hello": "world"}
