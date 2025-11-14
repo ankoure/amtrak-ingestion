@@ -1,12 +1,12 @@
 from datetime import date, datetime, timedelta
 import glob
-from config import s3_client
+from chaliceapp.config import s3_client
 from io import BytesIO
 import gzip
 import os
 import time
-from constants import S3_BUCKET, S3_DATA_TEMPLATE, EASTERN_TIME, LOCAL_DATA_TEMPLATE
-from disk import DATA_DIR
+from chaliceapp.constants import S3_BUCKET, S3_DATA_TEMPLATE, EASTERN_TIME, LOCAL_DATA_TEMPLATE
+from chaliceapp.disk import DATA_DIR
 import json
 
 

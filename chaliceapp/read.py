@@ -1,8 +1,8 @@
-from timefilter import filter_events
-from models.amtraker import TrainResponse
+from chaliceapp.timefilter import filter_events
+from chaliceapp.models.amtraker import TrainResponse
 import requests
 from pydantic import ValidationError
-from constants import AMTRAKER_API
+from chaliceapp.constants import AMTRAKER_API
 import polars as pl
 
 

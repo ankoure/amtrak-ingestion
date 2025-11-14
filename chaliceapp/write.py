@@ -1,10 +1,10 @@
 import polars as pl
 from datetime import datetime, timezone
-from disk import service_date
+from chaliceapp.disk import service_date
 import json
-from s3_upload import _compress_and_upload_file
+from chaliceapp.s3_upload import _compress_and_upload_file
 import os
-from constants import Provider
+from chaliceapp.constants import Provider
 
 
 def calculate_service_date_from_datetime(dt: datetime) -> str:

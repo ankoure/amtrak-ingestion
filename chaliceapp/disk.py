@@ -3,7 +3,7 @@ import os
 import pathlib
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
-from constants import DATA_DIR, CSV_FIELDS, CSV_FILENAME, Provider
+from chaliceapp.constants import DATA_DIR, CSV_FIELDS, CSV_FILENAME, Provider
 
 
 def service_date(ts: datetime) -> date:

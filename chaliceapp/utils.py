@@ -1,11 +1,11 @@
 from urllib.request import urlretrieve
 from zipfile import ZipFile
-from models.amtraker import TrainResponse
+from chaliceapp.models.amtraker import TrainResponse
 from tempfile import mkdtemp
 import os
 import polars as pl
-from config import s3_client
-from constants import S3_BUCKET
+from chaliceapp.config import s3_client
+from chaliceapp.constants import S3_BUCKET
 from botocore.exceptions import ClientError
 
 
