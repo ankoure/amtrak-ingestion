@@ -1,0 +1,84 @@
+{
+  "Parameters": {
+    "DDApiKey": {
+      "Type": "String",
+      "Description": "Datadog API key."
+    },
+    "DDTags": {
+      "Type": "String",
+      "Description": "Additional Datadog Tags"
+    },
+    "GitVersion": {
+      "Type": "String",
+      "Description": "Current Git Id"
+    }
+  },
+  "Resources": {
+    "UpdateGtfsCache": {
+      "Type": "AWS::Serverless::Function",
+      "Properties": {
+        "Environment": {
+          "Variables": {
+            "DD_LAMBDA_HANDLER": "app.update_gtfs_cache",
+            "DD_API_KEY": {
+              "Ref": "DDApiKey"
+            },
+            "DD_VERSION": {
+              "Ref": "GitVersion"
+            },
+            "DD_TAGS": {
+              "Ref": "DDTags"
+            }
+          }
+        },
+        "EphemeralStorage": {
+          "Size": 2048
+        }
+      }
+    },
+    "ConsumeAmtrakerApi": {
+      "Type": "AWS::Serverless::Function",
+      "Properties": {
+        "Environment": {
+          "Variables": {
+            "DD_LAMBDA_HANDLER": "app.consume_amtraker_api",
+            "DD_API_KEY": {
+              "Ref": "DDApiKey"
+            },
+            "DD_VERSION": {
+              "Ref": "GitVersion"
+            },
+            "DD_TAGS": {
+              "Ref": "DDTags"
+            }
+          }
+        },
+        "EphemeralStorage": {
+          "Size": 2048
+        }
+      }
+    },
+    "CollatePreviousDay": {
+      "Type": "AWS::Serverless::Function",
+      "Properties": {
+        "Environment": {
+          "Variables": {
+            "DD_LAMBDA_HANDLER": "app.collate_previous_day",
+            "DD_API_KEY": {
+              "Ref": "DDApiKey"
+            },
+            "DD_VERSION": {
+              "Ref": "GitVersion"
+            },
+            "DD_TAGS": {
+              "Ref": "DDTags"
+            }
+          }
+        },
+        "EphemeralStorage": {
+          "Size": 2048
+        }
+      }
+    }
+  }
+}

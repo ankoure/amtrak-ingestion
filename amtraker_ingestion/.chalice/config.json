@@ -1,0 +1,57 @@
+{
+  "version": "2.0",
+  "app_name": "amtraker-ingestion",
+  "automatic_layer": true,
+  "stages": {
+    "dev": {
+      "api_gateway_stage": "api",
+      "autogen_policy": false,
+      "tags": {
+        "service": "mbta-performance",
+        "env": "dev"
+      },
+      "lambda_functions": {
+        "update_gtfs_cache": {
+          "iam_policy_file": "policy-amtraker-ingest.json",
+          "lambda_timeout": 900,
+          "lambda_memory_size": 2048
+        },
+        "consume_amtraker_api": {
+          "iam_policy_file": "policy-amtraker-ingest.json",
+          "lambda_timeout": 900,
+          "lambda_memory_size": 2048
+        },
+        "collate_previous_day": {
+          "iam_policy_file": "policy-amtraker-ingest.json",
+          "lambda_timeout": 900,
+          "lambda_memory_size": 2048
+        }
+      }
+    },
+    "prod": {
+      "api_gateway_stage": "api",
+      "autogen_policy": false,
+      "tags": {
+        "service": "mbta-performance",
+        "env": "prod"
+      },
+      "lambda_functions": {
+        "update_gtfs_cache": {
+          "iam_policy_file": "policy-lamp-ingest.json",
+          "lambda_timeout": 900,
+          "lambda_memory_size": 2048
+        },
+        "consume_amtraker_api": {
+          "iam_policy_file": "policy-lamp-ingest.json",
+          "lambda_timeout": 900,
+          "lambda_memory_size": 2048
+        },
+        "collate_previous_day": {
+          "iam_policy_file": "policy-lamp-ingest.json",
+          "lambda_timeout": 900,
+          "lambda_memory_size": 2048
+        }
+      }
+    }
+  }
+}

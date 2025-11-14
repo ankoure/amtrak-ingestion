@@ -1,11 +1,11 @@
 from chalice.app import Chalice, Cron
-from chaliceapp.main import (
+from chalicelib.main import (
     check_gtfs_bundle_loop,
     generate_event_data,
     collate_amtraker_data as collate_previous_day_data,
 )
-from chaliceapp.main import collate_amtraker_data_for_date
-from chaliceapp.constants import Provider
+from chalicelib.main import collate_amtraker_data_for_date
+from chalicelib.constants import Provider
 
 app = Chalice(app_name="amtrak-ingestion")
 

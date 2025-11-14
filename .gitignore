@@ -1,6 +1,6 @@
 # Chalice
-.chalice/deployments/
-.chalice/venv/
+amtraker_ingestion/.chalice/deployments/
+amtraker_ingestion/.chalice/venv/
 
 # Python
 __pycache__/
@@ -25,7 +25,6 @@ Thumbs.db
 
 # Project specific
 old
-*.json
 gtfs
 typescript_defs
 gtfs.zip

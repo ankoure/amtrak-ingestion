@@ -1,10 +1,10 @@
 import polars as pl
 from datetime import datetime, timezone
-from chaliceapp.disk import service_date
+from chalicelib.disk import service_date
 import json
-from chaliceapp.s3_upload import _compress_and_upload_file
+from chalicelib.s3_upload import _compress_and_upload_file
 import os
-from chaliceapp.constants import Provider
+from chalicelib.constants import Provider
 
 
 def calculate_service_date_from_datetime(dt: datetime) -> str:
@@ -123,8 +123,10 @@ def write_amtraker_events(
     date = datetime.now(timezone.utc)
 
     mode_str = str(mode)
+    # Use /tmp in Lambda, otherwise use data/ directory
+    base_dir = "/tmp" if "AWS_EXECUTION_ENV" in os.environ else "data"
     fname = (
-        f"data/raw/{mode_str}/{date.strftime('Year=%Y/Month=%m/Day=%d/_%H_%M')}.json"
+        f"{base_dir}/raw/{mode_str}/{date.strftime('Year=%Y/Month=%m/Day=%d/_%H_%M')}.json"
     )
     # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(fname), exist_ok=True)

@@ -1,12 +1,18 @@
 import boto3
-from dotenv import load_dotenv
 import os
 
-load_dotenv()
+# Only load dotenv if not running in Lambda
+if "AWS_EXECUTION_ENV" not in os.environ:
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
 
 AWS_PROFILE = os.environ.get("AWS_PROFILE")
 
-if AWS_PROFILE:
+# In Lambda, don't use profiles - use IAM role
+if AWS_PROFILE and "AWS_EXECUTION_ENV" not in os.environ:
     session = boto3.Session(region_name="us-east-1", profile_name=AWS_PROFILE)
 else:
     session = boto3.Session(region_name="us-east-1")

@@ -1,15 +1,19 @@
 from pathlib import Path
-from chaliceapp.read import read_amtraker_data
-from chaliceapp.transform import add_direction_id, add_scheduled_metrics
-from chaliceapp.gtfs import (
+from chalicelib.read import read_amtraker_data
+from chalicelib.transform import add_direction_id, add_scheduled_metrics
+from chalicelib.gtfs import (
     generate_direction_on_custom_headsign,
     get_gtfs_last_modified,
     upload_gtfs_bundle,
 )
-from chaliceapp.timefilter import set_last_processed
-from chaliceapp.write import add_service_dates, write_amtraker_events
-from chaliceapp.utils import get_latest_gtfs_archive, get_latest_gtfs_archive_from_cache
-from chaliceapp.constants import (
+from chalicelib.timefilter import set_last_processed
+from chalicelib.write import add_service_dates, write_amtraker_events
+from chalicelib.utils import (
+    get_latest_gtfs_archive,
+    get_latest_gtfs_archive_from_cache,
+    cleanup_old_gtfs_temp_dirs,
+)
+from chalicelib.constants import (
     AMTRAK_STATIC_GTFS,
     VIA_RAIL_STATIC_GTFS,
     BRIGHTLINE_STATIC_GTFS,
@@ -18,13 +22,13 @@ from chaliceapp.constants import (
     LOCAL_DATA_TEMPLATE,
     Provider,
 )
-from chaliceapp.config import (
+from chalicelib.config import (
     AMTRAK_ENABLED,
     VIA_ENABLED,
     BRIGHTLINE_ENABLED,
     ENVIRONMENT,
 )
-from chaliceapp.s3_upload import (
+from chalicelib.s3_upload import (
     get_s3_json,
     set_s3_json,
     s3_client,
@@ -32,13 +36,16 @@ from chaliceapp.s3_upload import (
 )
 import urllib.request
 from datetime import datetime, timedelta
-from chaliceapp.disk import write_event
+from chalicelib.disk import write_event
 import glob
 import gzip
 import json
 
 
 def generate_event_data():
+    # Clean up any old GTFS temp directories to prevent disk space issues
+    cleanup_old_gtfs_temp_dirs()
+
     amtrak = AMTRAK_ENABLED
     via = VIA_ENABLED
     brightline = BRIGHTLINE_ENABLED
@@ -91,6 +98,9 @@ def generate_event_data():
 
     if ENVIRONMENT == "PROD":
         set_last_processed()
+
+    # Clean up GTFS temp directories after processing
+    cleanup_old_gtfs_temp_dirs()
 
 
 def check_gtfs_bundle_loop():

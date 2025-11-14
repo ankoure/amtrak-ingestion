@@ -1,12 +1,42 @@
 from urllib.request import urlretrieve
 from zipfile import ZipFile
-from chaliceapp.models.amtraker import TrainResponse
+from chalicelib.models.amtraker import TrainResponse
 from tempfile import mkdtemp
 import os
+import shutil
 import polars as pl
-from chaliceapp.config import s3_client
-from chaliceapp.constants import S3_BUCKET
+from chalicelib.config import s3_client
+from chalicelib.constants import S3_BUCKET
 from botocore.exceptions import ClientError
+from contextlib import contextmanager
+
+
+@contextmanager
+def temp_gtfs_directory():
+    """Context manager for creating and cleaning up temporary GTFS directories."""
+    temp_dir = mkdtemp(prefix="gtfs_")
+    try:
+        yield temp_dir
+    finally:
+        # Clean up the temporary directory
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+
+
+def cleanup_old_gtfs_temp_dirs():
+    """Clean up old GTFS temporary directories from /tmp to prevent disk space issues."""
+    import glob
+
+    # Find all gtfs_* directories in /tmp
+    temp_dirs = glob.glob("/tmp/gtfs_*")
+
+    for temp_dir in temp_dirs:
+        try:
+            if os.path.isdir(temp_dir):
+                shutil.rmtree(temp_dir)
+        except Exception as e:
+            # Log but don't fail if cleanup fails
+            print(f"Warning: Could not remove {temp_dir}: {e}")
 
 
 def get_latest_gtfs_archive_from_cache(agency: str) -> str | None:

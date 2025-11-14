@@ -9,7 +9,7 @@ import polars as pl
 from pathlib import Path
 import requests
 from datetime import datetime
-from chaliceapp.config import s3_client
+from chalicelib.config import s3_client
 
 
 def load_gtfs_stop_times(gtfs_dir: str) -> pl.DataFrame:

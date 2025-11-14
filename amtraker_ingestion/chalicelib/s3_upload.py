@@ -1,12 +1,12 @@
 from datetime import date, datetime, timedelta
 import glob
-from chaliceapp.config import s3_client
+from chalicelib.config import s3_client
 from io import BytesIO
 import gzip
 import os
 import time
-from chaliceapp.constants import S3_BUCKET, S3_DATA_TEMPLATE, EASTERN_TIME, LOCAL_DATA_TEMPLATE
-from chaliceapp.disk import DATA_DIR
+from chalicelib.constants import S3_BUCKET, S3_DATA_TEMPLATE, EASTERN_TIME, LOCAL_DATA_TEMPLATE
+from chalicelib.disk import DATA_DIR
 import json
 
 
@@ -46,7 +46,13 @@ def service_date(ts: datetime) -> date:
 def _compress_and_upload_file(fp: str):
     """Compress a file in-memory and upload to S3."""
     # generate output location
-    rp = os.path.relpath(fp, DATA_DIR)
+    # Handle both /tmp (Lambda) and data/ (local) paths
+    if fp.startswith("/tmp/"):
+        # In Lambda: /tmp/raw/Provider/... -> raw/Provider/...
+        rp = fp.replace("/tmp/", "")
+    else:
+        # Local: data/raw/Provider/... -> raw/Provider/...
+        rp = os.path.relpath(fp, DATA_DIR)
     s3_key = S3_DATA_TEMPLATE.format(relative_path=rp)
 
     with open(fp, "rb") as f:
@@ -54,11 +60,13 @@ def _compress_and_upload_file(fp: str):
         gz_bytes = gzip.compress(f.read())
         buffer = BytesIO(gz_bytes)
 
+        # Determine content type from file extension
+        content_type = "application/json" if fp.endswith(".json") else "text/csv"
         s3_client.upload_fileobj(
             buffer,
             S3_BUCKET,
             Key=s3_key,
-            ExtraArgs={"ContentType": "text/csv", "ContentEncoding": "gzip"},
+            ExtraArgs={"ContentType": content_type, "ContentEncoding": "gzip"},
         )
 
 

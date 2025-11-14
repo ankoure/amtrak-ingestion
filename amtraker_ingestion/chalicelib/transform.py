@@ -1,6 +1,6 @@
 import polars as pl
 
-from chaliceapp.gtfs import generate_direction_lookup, calculate_gtfs_metrics
+from chalicelib.gtfs import generate_direction_lookup, calculate_gtfs_metrics
 
 
 def add_direction_id(amtraker_df: pl.DataFrame, gtfs_dir: str) -> pl.DataFrame:

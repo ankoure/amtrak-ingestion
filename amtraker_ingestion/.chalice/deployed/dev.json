@@ -1,0 +1,71 @@
+{
+  "resources": [
+    {
+      "name": "update_gtfs_cache_role",
+      "resource_type": "iam_role",
+      "role_arn": "arn:aws:iam::081194948292:role/amtraker-ingestion-dev-update_gtfs_cache",
+      "role_name": "amtraker-ingestion-dev-update_gtfs_cache"
+    },
+    {
+      "name": "update_gtfs_cache",
+      "resource_type": "lambda_function",
+      "lambda_arn": "arn:aws:lambda:us-east-1:081194948292:function:amtraker-ingestion-dev-update_gtfs_cache"
+    },
+    {
+      "name": "update_gtfs_cache-event",
+      "resource_type": "cloudwatch_event",
+      "rule_name": "amtraker-ingestion-dev-update_gtfs_cache-event"
+    },
+    {
+      "name": "consume_amtraker_api_role",
+      "resource_type": "iam_role",
+      "role_arn": "arn:aws:iam::081194948292:role/amtraker-ingestion-dev-consume_amtraker_api",
+      "role_name": "amtraker-ingestion-dev-consume_amtraker_api"
+    },
+    {
+      "name": "consume_amtraker_api",
+      "resource_type": "lambda_function",
+      "lambda_arn": "arn:aws:lambda:us-east-1:081194948292:function:amtraker-ingestion-dev-consume_amtraker_api"
+    },
+    {
+      "name": "consume_amtraker_api-event",
+      "resource_type": "cloudwatch_event",
+      "rule_name": "amtraker-ingestion-dev-consume_amtraker_api-event"
+    },
+    {
+      "name": "collate_previous_day_role",
+      "resource_type": "iam_role",
+      "role_arn": "arn:aws:iam::081194948292:role/amtraker-ingestion-dev-collate_previous_day",
+      "role_name": "amtraker-ingestion-dev-collate_previous_day"
+    },
+    {
+      "name": "collate_previous_day",
+      "resource_type": "lambda_function",
+      "lambda_arn": "arn:aws:lambda:us-east-1:081194948292:function:amtraker-ingestion-dev-collate_previous_day"
+    },
+    {
+      "name": "collate_previous_day-event",
+      "resource_type": "cloudwatch_event",
+      "rule_name": "amtraker-ingestion-dev-collate_previous_day-event"
+    },
+    {
+      "name": "api_handler_role",
+      "resource_type": "iam_role",
+      "role_arn": "arn:aws:iam::081194948292:role/amtraker-ingestion-dev-api_handler",
+      "role_name": "amtraker-ingestion-dev-api_handler"
+    },
+    {
+      "name": "api_handler",
+      "resource_type": "lambda_function",
+      "lambda_arn": "arn:aws:lambda:us-east-1:081194948292:function:amtraker-ingestion-dev"
+    },
+    {
+      "name": "rest_api",
+      "resource_type": "rest_api",
+      "rest_api_id": "0kyd886cw0",
+      "rest_api_url": "https://0kyd886cw0.execute-api.us-east-1.amazonaws.com/api/"
+    }
+  ],
+  "schema_version": "2.0",
+  "backend": "api"
+}

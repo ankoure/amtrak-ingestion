@@ -1,8 +1,8 @@
 import polars as pl
 from datetime import datetime, timezone
-from chaliceapp.config import s3_client
+from chalicelib.config import s3_client
 import json
-from chaliceapp.constants import S3_BUCKET
+from chalicelib.constants import S3_BUCKET
 
 
 def filter_events(df: pl.DataFrame, date_column: str) -> pl.DataFrame:
