@@ -1,7 +1,13 @@
-from chalice import Chalice, Cron
-from chaliceapp.main import check_gtfs_bundle_loop, generate_event_data
+from chalice.app import Chalice, Cron
+from chaliceapp.main import (
+    check_gtfs_bundle_loop,
+    generate_event_data,
+    collate_amtraker_data as collate_previous_day_data,
+)
+from chaliceapp.main import collate_amtraker_data_for_date
+from chaliceapp.constants import Provider
 
-app = Chalice(app_name="test")
+app = Chalice(app_name="amtrak-ingestion")
 
 
 @app.route("/")
@@ -53,6 +59,69 @@ def manual_amtraker_update():
     generate_event_data()
 
     return {"status": "completed"}
+
+
+@app.schedule(Cron(0, 3, "*", "*", "?", "*"))
+def collate_previous_day(event):
+    """
+    Scheduled function to collate previous day's data for all providers
+    Runs daily at 3:00 AM UTC (which gives time for all data to be collected)
+
+    The Cron format is: Cron(minutes, hours, day_of_month, month, day_of_week, year)
+    Current: 0 3 * * ? * = Every day at 3:00 AM UTC
+    """
+    collate_previous_day_data()
+
+
+@app.route("/amtraker/collate", methods=["POST"])
+def manual_collate_amtraker_data():
+    """
+    Manual endpoint to collate Amtraker data for a specified day or previous day
+
+    Expects JSON body (optional):
+    {
+        "year": 2025,      // optional - if not provided, collates previous day
+        "month": 1,        // optional - if not provided, collates previous day
+        "day": 15,         // optional - if not provided, collates previous day
+        "mode": "amtrak"   // optional, defaults to "Amtrak" (only used if date specified)
+    }
+
+    If no parameters provided, collates previous day's data for all providers.
+    """
+
+    request = app.current_request
+    params = request.json_body if request.json_body else {}
+
+    year = params.get("year")
+    month = params.get("month")
+    day = params.get("day")
+    mode_str = params.get("mode", "Amtrak")
+
+    # Convert string to Provider enum if valid
+    try:
+        mode = Provider(mode_str)
+    except ValueError:
+        mode = mode_str  # Keep as string if not a valid Provider
+
+    # If no date specified, collate previous day for all providers
+    if not all([year, month, day]):
+        collate_previous_day_data()
+        return {
+            "status": "completed",
+            "message": "Collated previous day's data for all providers",
+        }
+
+    # If date specified, collate for that specific date and provider
+    events = collate_amtraker_data_for_date(year, month, day, mode)
+
+    return {
+        "status": "completed",
+        "events_count": len(events),
+        "year": year,
+        "month": month,
+        "day": day,
+        "mode": mode,
+    }
 
 
 # The view function above will return {"hello": "world"}

@@ -16,4 +16,4 @@ s3_client = session.client("s3")
 AMTRAK_ENABLED = True
 VIA_ENABLED = True
 BRIGHTLINE_ENABLED = False
-ENVIRONMENT = "DEV"
+ENVIRONMENT = "PROD"

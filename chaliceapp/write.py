@@ -4,6 +4,7 @@ from disk import service_date
 import json
 from s3_upload import _compress_and_upload_file
 import os
+from constants import Provider
 
 
 def calculate_service_date_from_datetime(dt: datetime) -> str:
@@ -51,7 +52,9 @@ def add_service_dates(enriched_df: pl.DataFrame) -> pl.DataFrame:
     return df_with_dates
 
 
-def write_amtraker_events(enriched_df: pl.DataFrame, mode: str = "amtrak"):
+def write_amtraker_events(
+    enriched_df: pl.DataFrame, mode: Provider | str = Provider.AMTRAK
+):
     """
     Args:
         enriched_df: Polars DataFrame with enriched Amtraker data (must include
@@ -119,7 +122,10 @@ def write_amtraker_events(enriched_df: pl.DataFrame, mode: str = "amtrak"):
     json_string = json.dumps(list_of_dicts)
     date = datetime.now(timezone.utc)
 
-    fname = f"data/raw/{mode}/{date.strftime('Year=%Y/Month=%m/Day=%d/_%H_%M')}.json"
+    mode_str = str(mode)
+    fname = (
+        f"data/raw/{mode_str}/{date.strftime('Year=%Y/Month=%m/Day=%d/_%H_%M')}.json"
+    )
     # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(fname), exist_ok=True)
 

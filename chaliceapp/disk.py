@@ -3,7 +3,7 @@ import os
 import pathlib
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
-from constants import DATA_DIR, CSV_FIELDS, CSV_FILENAME
+from constants import DATA_DIR, CSV_FIELDS, CSV_FILENAME, Provider
 
 
 def service_date(ts: datetime) -> date:
@@ -19,7 +19,11 @@ def service_date(ts: datetime) -> date:
 
 
 def output_dir_path(
-    route_id: str, direction_id: str, stop_id: str, ts: datetime, mode: str = "amtrak"
+    route_id: str,
+    direction_id: str,
+    stop_id: str,
+    ts: datetime,
+    mode: Provider | str = Provider.AMTRAK,
 ) -> str:
     date = service_date(ts)
     delimiter = "_"
@@ -34,7 +38,7 @@ def output_dir_path(
     )
 
 
-def write_event(event: dict, mode: str = "amtrak"):
+def write_event(event: dict, mode: Provider | str = Provider.AMTRAK):
     # Convert event_time to datetime if it's a string
     event_time = event["event_time"]
     if isinstance(event_time, str):

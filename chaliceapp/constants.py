@@ -1,5 +1,18 @@
 from zoneinfo import ZoneInfo
 import pathlib
+from enum import Enum
+
+
+class Provider(str, Enum):
+    """Standardized provider names for transit agencies."""
+
+    AMTRAK = "Amtrak"
+    VIA = "VIA"
+    BRIGHTLINE = "Brightline"
+
+    def __str__(self):
+        return self.value
+
 
 AMTRAKER_API = "https://api-v3.amtraker.com/v3/trains"
 AMTRAK_STATIC_GTFS = "https://content.amtrak.com/content/gtfs/GTFS.zip"
