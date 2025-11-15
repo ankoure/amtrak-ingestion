@@ -5,10 +5,12 @@ from tempfile import mkdtemp
 import os
 import shutil
 import polars as pl
-from chalicelib.config import s3_client
+from chalicelib.config import s3_client, get_logger
 from chalicelib.constants import S3_BUCKET
 from botocore.exceptions import ClientError
 from contextlib import contextmanager
+
+logger = get_logger(__name__)
 
 
 @contextmanager
@@ -24,19 +26,38 @@ def temp_gtfs_directory():
 
 
 def cleanup_old_gtfs_temp_dirs():
-    """Clean up old GTFS temporary directories from /tmp to prevent disk space issues."""
+    """
+    Clean up old GTFS temporary directories from /tmp
+    to prevent disk space issues.
+    """
     import glob
 
     # Find all gtfs_* directories in /tmp
     temp_dirs = glob.glob("/tmp/gtfs_*")
 
+    if not temp_dirs:
+        logger.debug("No old GTFS temp directories to clean up")
+        return
+
+    logger.info(f"Cleaning up {len(temp_dirs)} old GTFS temp directories")
+    removed_count = 0
+    failed_count = 0
+
     for temp_dir in temp_dirs:
         try:
             if os.path.isdir(temp_dir):
                 shutil.rmtree(temp_dir)
+                removed_count += 1
+                logger.debug(f"Removed temp directory: {temp_dir}")
         except Exception as e:
             # Log but don't fail if cleanup fails
-            print(f"Warning: Could not remove {temp_dir}: {e}")
+            logger.warning(f"Could not remove {temp_dir}: {e}")
+            failed_count += 1
+
+    logger.info(
+        f"Cleanup completed - Removed: {removed_count}, "
+        f"Failed: {failed_count}"
+    )
 
 
 def get_latest_gtfs_archive_from_cache(agency: str) -> str | None:
@@ -47,9 +68,14 @@ def get_latest_gtfs_archive_from_cache(agency: str) -> str | None:
         agency: Agency name (e.g., "Amtrak", "Via", "Brightline")
 
     Returns:
-        Path to extracted GTFS directory, or None if file doesn't exist in S3
+        Path to extracted GTFS directory, or None if file doesn't
+        exist in S3
     """
     s3_key = f"GTFS/{agency}.zip"
+    logger.debug(
+        f"Attempting to load {agency} GTFS from cache: "
+        f"s3://{S3_BUCKET}/{s3_key}"
+    )
 
     # Create a named temporary directory
     temp_dir = mkdtemp(prefix="gtfs_")
@@ -58,37 +84,78 @@ def get_latest_gtfs_archive_from_cache(agency: str) -> str | None:
     try:
         # Download the GTFS zip file from S3
         s3_client.download_file(S3_BUCKET, s3_key, gtfs_zip)
+        zip_size = os.path.getsize(gtfs_zip)
+        logger.debug(f"Downloaded {agency} GTFS from cache: {zip_size} bytes")
     except ClientError as e:
         # Check if the error is because the file doesn't exist
         if (
             e.response["Error"]["Code"] == "404"
             or e.response["Error"]["Code"] == "NoSuchKey"
         ):
+            logger.info(f"{agency} GTFS not found in cache")
             return None
         # Re-raise other errors
+        logger.error(
+            f"Error downloading {agency} GTFS from cache: {e}",
+            exc_info=True
+        )
         raise
 
     # Extract the GTFS archive
     gtfs_extract_path = os.path.join(temp_dir, "gtfs")
-    with ZipFile(gtfs_zip, "r") as zObject:
-        zObject.extractall(path=gtfs_extract_path)
+    try:
+        with ZipFile(gtfs_zip, "r") as zObject:
+            zObject.extractall(path=gtfs_extract_path)
+        logger.info(
+            f"Extracted {agency} GTFS from cache to {gtfs_extract_path}"
+        )
+    except Exception as e:
+        logger.error(
+            f"Error extracting {agency} GTFS archive: {e}",
+            exc_info=True
+        )
+        raise
 
     return gtfs_extract_path
 
 
 def get_latest_gtfs_archive(GTFS_URL: str) -> str:
+    """
+    Download and extract GTFS archive from a URL.
+
+    Args:
+        GTFS_URL: URL to download GTFS zip file from
+
+    Returns:
+        Path to extracted GTFS directory
+    """
+    logger.info(f"Downloading GTFS archive from {GTFS_URL}")
+
     # Create a named temporary directory
     temp_dir = mkdtemp(prefix="gtfs_")
 
-    # Download the GTFS zip file to a temporary location
-    gtfs_zip, _ = urlretrieve(GTFS_URL, os.path.join(temp_dir, "gtfs.zip"))
+    try:
+        # Download the GTFS zip file to a temporary location
+        gtfs_zip, _ = urlretrieve(
+            GTFS_URL, os.path.join(temp_dir, "gtfs.zip")
+        )
+        zip_size = os.path.getsize(gtfs_zip)
+        logger.info(f"Downloaded GTFS archive: {zip_size} bytes")
 
-    # Extract the GTFS archive
-    gtfs_extract_path = os.path.join(temp_dir, "gtfs")
-    with ZipFile(gtfs_zip, "r") as zObject:
-        zObject.extractall(path=gtfs_extract_path)
+        # Extract the GTFS archive
+        gtfs_extract_path = os.path.join(temp_dir, "gtfs")
+        with ZipFile(gtfs_zip, "r") as zObject:
+            zObject.extractall(path=gtfs_extract_path)
 
-    return gtfs_extract_path
+        logger.info(f"Extracted GTFS archive to {gtfs_extract_path}")
+        return gtfs_extract_path
+
+    except Exception as e:
+        logger.error(
+            f"Error downloading/extracting GTFS from {GTFS_URL}: {e}",
+            exc_info=True
+        )
+        raise
 
 
 def trains_to_list(train_response: TrainResponse) -> list[dict]:

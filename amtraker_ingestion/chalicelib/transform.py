@@ -1,20 +1,31 @@
 import polars as pl
+import time
 
 from chalicelib.gtfs import generate_direction_lookup, calculate_gtfs_metrics
+from chalicelib.config import get_logger
+
+logger = get_logger(__name__)
 
 
 def add_direction_id(amtraker_df: pl.DataFrame, gtfs_dir: str) -> pl.DataFrame:
     """
     Enrich Amtraker train data with GTFS information like direction_id.
-    Uses primary lookup by trainNumRaw, falls back to secondary lookup by destCode (destination stop_id).
+    Uses primary lookup by trainNumRaw, falls back to secondary lookup by
+    destCode (destination stop_id).
 
     Args:
-        amtraker_df: Polars DataFrame with train data from read_amtraker_data
+        amtraker_df: Polars DataFrame with train data
         gtfs_dir: Path to extracted GTFS directory
 
     Returns:
         Polars DataFrame enriched with direction_id and lookup_method columns
     """
+    start_time = time.time()
+    input_rows = len(amtraker_df)
+    logger.debug(
+        f"Adding direction_id to {input_rows} rows using GTFS: {gtfs_dir}"
+    )
+
     # Generate GTFS lookups (primary and secondary DataFrames)
     primary_lookup, secondary_lookup = generate_direction_lookup(gtfs_dir)
 
@@ -31,7 +42,8 @@ def add_direction_id(amtraker_df: pl.DataFrame, gtfs_dir: str) -> pl.DataFrame:
         how="left",
     )
 
-    # Secondary lookup: join on destCode (destination station code) -> headsign_stop_id
+    # Secondary lookup: join on destCode (destination station)
+    # -> headsign_stop_id
     df_with_both = df_with_primary.join(
         secondary_lookup.select(
             [
@@ -61,34 +73,69 @@ def add_direction_id(amtraker_df: pl.DataFrame, gtfs_dir: str) -> pl.DataFrame:
         ]
     )
 
+    # Calculate lookup statistics
+    primary_hits = df_enriched.filter(
+        pl.col("lookup_method") == "primary"
+    ).height
+    secondary_hits = df_enriched.filter(
+        pl.col("lookup_method") == "secondary"
+    ).height
+    misses = df_enriched.filter(pl.col("direction_id").is_null()).height
+
     # Drop temporary columns
-    df_enriched = df_enriched.drop(["direction_id_primary", "direction_id_secondary"])
+    df_enriched = df_enriched.drop(
+        ["direction_id_primary", "direction_id_secondary"]
+    )
+
+    duration = time.time() - start_time
+    logger.info(
+        f"Direction ID lookup completed in {duration:.2f}s - "
+        f"Primary: {primary_hits}, Secondary: {secondary_hits}, "
+        f"Misses: {misses} "
+        f"({100 * (primary_hits + secondary_hits) / input_rows:.1f}% "
+        f"match rate)"
+    )
 
     return df_enriched
 
 
-def add_scheduled_metrics(amtraker_df: pl.DataFrame, gtfs_dir: str) -> pl.DataFrame:
+def add_scheduled_metrics(
+    amtraker_df: pl.DataFrame, gtfs_dir: str
+) -> pl.DataFrame:
     """
     Add scheduled headway and travel time metrics from GTFS to Amtraker data.
 
     Args:
-        amtraker_df: Polars DataFrame with train data (must have direction_id column)
+        amtraker_df: Polars DataFrame with train data
+                     (must have direction_id column)
         gtfs_dir: Path to extracted GTFS directory
 
     Returns:
-        Polars DataFrame enriched with scheduled_headway and scheduled_tt columns
+        Polars DataFrame enriched with scheduled_headway and
+        scheduled_tt columns
     """
+    start_time = time.time()
+    input_rows = len(amtraker_df)
+    logger.debug(
+        f"Adding scheduled metrics to {input_rows} rows using GTFS: "
+        f"{gtfs_dir}"
+    )
+
     # Calculate GTFS metrics (includes scheduled_headway and scheduled_tt)
     gtfs_metrics = calculate_gtfs_metrics(gtfs_dir)
+    logger.debug(f"Calculated GTFS metrics: {len(gtfs_metrics)} rows")
 
     # Aggregate GTFS metrics by stop and direction to get average values
     # This prevents cartesian product from multiple trips
-    gtfs_aggregated = gtfs_metrics.group_by(["stop_id", "direction_id"]).agg(
+    gtfs_aggregated = gtfs_metrics.group_by(
+        ["stop_id", "direction_id"]
+    ).agg(
         [
             pl.col("scheduled_headway").mean().alias("scheduled_headway"),
             pl.col("scheduled_tt").mean().alias("scheduled_tt"),
         ]
     )
+    logger.debug(f"Aggregated GTFS metrics: {len(gtfs_aggregated)} rows")
 
     # Join on stop_id (GTFS) -> code (Amtraker) and direction_id
     enriched_df = amtraker_df.join(
@@ -104,12 +151,27 @@ def add_scheduled_metrics(amtraker_df: pl.DataFrame, gtfs_dir: str) -> pl.DataFr
         how="left",
     )
 
+    # Calculate join success rate
+    metrics_found = enriched_df.filter(
+        pl.col("scheduled_headway").is_not_null()
+    ).height
+    metrics_missing = enriched_df.filter(
+        pl.col("scheduled_headway").is_null()
+    ).height
+
     # Convert scheduled metrics to integers (rounding from mean aggregation)
     enriched_df = enriched_df.with_columns(
         [
             pl.col("scheduled_headway").round(0).cast(pl.Int64),
             pl.col("scheduled_tt").round(0).cast(pl.Int64),
         ]
+    )
+
+    duration = time.time() - start_time
+    logger.info(
+        f"Scheduled metrics added in {duration:.2f}s - "
+        f"Found: {metrics_found}, Missing: {metrics_missing} "
+        f"({100 * metrics_found / input_rows:.1f}% match rate)"
     )
 
     return enriched_df

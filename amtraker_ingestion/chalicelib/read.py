@@ -1,9 +1,13 @@
 from chalicelib.timefilter import filter_events
 from chalicelib.models.amtraker import TrainResponse
+from chalicelib.config import get_logger
 import requests
 from pydantic import ValidationError
 from chalicelib.constants import AMTRAKER_API
 import polars as pl
+import time
+
+logger = get_logger(__name__)
 
 
 def validate_amtraker_data(amtraker_api_url: str) -> TrainResponse:
@@ -20,18 +24,48 @@ def validate_amtraker_data(amtraker_api_url: str) -> TrainResponse:
         ValidationError: If the API response doesn't match the expected schema
         requests.RequestException: If the HTTP request fails
     """
-    r = requests.get(amtraker_api_url)
-    r.raise_for_status()
-    data = r.json()
+    logger.debug(f"Fetching data from Amtraker API: {amtraker_api_url}")
+    start_time = time.time()
 
     try:
+        r = requests.get(amtraker_api_url, timeout=30)
+        r.raise_for_status()
+        request_duration = time.time() - start_time
+
+        data = r.json()
+        response_size = len(r.content)
+
+        logger.info(
+            f"API request successful - "
+            f"{response_size} bytes received in {request_duration:.2f}s"
+        )
+
         # Validate the response data
+        validation_start = time.time()
         validated_data = TrainResponse.model_validate(data)
+        validation_duration = time.time() - validation_start
+
+        # Count trains in response
+        train_count = sum(len(trains) for trains in validated_data.root.values())
+
+        logger.info(
+            f"API response validated in {validation_duration:.2f}s - "
+            f"{train_count} trains found"
+        )
 
         return validated_data
 
+    except requests.RequestException as e:
+        logger.error(
+            f"HTTP request failed after {time.time() - start_time:.2f}s: {e}",
+            exc_info=True
+        )
+        raise
     except ValidationError as e:
-        print(f"Validation error while processing Amtraker data: {e}")
+        logger.error(
+            f"Validation error while processing Amtraker data: {e}",
+            exc_info=True
+        )
         raise
 
 
@@ -148,14 +182,52 @@ def split_df_by_provider(
 
 
 def read_amtraker_data() -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+    """
+    Read and process Amtraker API data through complete pipeline.
+
+    Returns:
+        Tuple of (amtrak_df, via_df, brightline_df) DataFrames
+    """
+    logger.debug("Starting Amtraker data processing pipeline")
+    pipeline_start = time.time()
+
+    # Fetch and validate
     train_response = validate_amtraker_data(AMTRAKER_API)
+
+    # Convert to DataFrame
     df = trainresponse_to_polars(train_response)
+    logger.debug(f"Converted to Polars DataFrame: {len(df)} rows")
+
+    # Process through pipeline
     new_df = remove_excess_fields(df)
+    logger.debug(f"Removed excess fields: {len(new_df)} rows")
+
     exploded_df = explode_df(new_df)
+    logger.debug(f"Exploded stations: {len(exploded_df)} rows")
+
     cleanup_stations = remove_excess_columns_from_stations(exploded_df)
+    logger.debug(f"Cleaned up station columns: {len(cleanup_stations)} rows")
+
     time_filter = filter_events(cleanup_stations, "dep")
+    logger.debug(f"Applied time filter: {len(time_filter)} rows")
+
     remove_bus_df = remove_bus(time_filter)
-    return split_df_by_provider(remove_bus_df)
+    logger.debug(
+        f"Removed bus services and non-departed: {len(remove_bus_df)} rows"
+    )
+
+    # Split by provider
+    amtrak_df, via_df, brightline_df = split_df_by_provider(remove_bus_df)
+
+    pipeline_duration = time.time() - pipeline_start
+    logger.info(
+        f"Data processing pipeline completed in {pipeline_duration:.2f}s - "
+        f"Input: {len(df)} rows, Output: {len(remove_bus_df)} rows "
+        f"(Amtrak: {len(amtrak_df)}, Via: {len(via_df)}, "
+        f"Brightline: {len(brightline_df)})"
+    )
+
+    return amtrak_df, via_df, brightline_df
 
 
 if __name__ == "__main__":

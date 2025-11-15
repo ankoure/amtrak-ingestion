@@ -5,6 +5,10 @@ import json
 from chalicelib.s3_upload import _compress_and_upload_file
 import os
 from chalicelib.constants import Provider
+from chalicelib.config import get_logger
+import time
+
+logger = get_logger(__name__)
 
 
 def calculate_service_date_from_datetime(dt: datetime) -> str:
@@ -56,11 +60,20 @@ def write_amtraker_events(
     enriched_df: pl.DataFrame, mode: Provider | str = Provider.AMTRAK
 ):
     """
+    Generate and write arrival/departure events from enriched data.
+
     Args:
-        enriched_df: Polars DataFrame with enriched Amtraker data (must include
-                     direction_id, scheduled_headway, scheduled_tt, and service_date columns)
-        mode: Provider name for output directory (e.g., "amtrak", "via", "brightline")
+        enriched_df: Polars DataFrame with enriched Amtraker data
+                     (must include direction_id, scheduled_headway,
+                     scheduled_tt, and service_date columns)
+        mode: Provider name for output directory
     """
+    start_time = time.time()
+    input_rows = len(enriched_df)
+    logger.info(
+        f"Writing events for {mode}: {input_rows} input rows"
+    )
+
     # Add service_date columns first
     df_with_service_dates = add_service_dates(enriched_df)
 
@@ -68,6 +81,8 @@ def write_amtraker_events(
     records = df_with_service_dates.to_dicts()
 
     list_of_dicts = []
+    arrival_count = 0
+    departure_count = 0
 
     for record in records:
         # Create arrival event
@@ -94,6 +109,7 @@ def write_amtraker_events(
                 "scheduled_tt": record.get("scheduled_tt"),
             }
             list_of_dicts.append(arrival_event)
+            arrival_count += 1
 
         # Create departure event
         dep_time = record.get("dep")
@@ -119,18 +135,45 @@ def write_amtraker_events(
                 "scheduled_tt": record.get("scheduled_tt"),
             }
             list_of_dicts.append(departure_event)
+            departure_count += 1
+
     json_string = json.dumps(list_of_dicts)
+    json_size = len(json_string)
     date = datetime.now(timezone.utc)
 
     mode_str = str(mode)
     # Use /tmp in Lambda, otherwise use data/ directory
     base_dir = "/tmp" if "AWS_EXECUTION_ENV" in os.environ else "data"
     fname = (
-        f"{base_dir}/raw/{mode_str}/{date.strftime('Year=%Y/Month=%m/Day=%d/_%H_%M')}.json"
+        f"{base_dir}/raw/{mode_str}/"
+        f"{date.strftime('Year=%Y/Month=%m/Day=%d/_%H_%M')}.json"
     )
     # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(fname), exist_ok=True)
 
-    with open(fname, "w") as file:
-        file.write(json_string)
+    logger.debug(f"Writing events to file: {fname}")
+
+    try:
+        with open(fname, "w") as file:
+            file.write(json_string)
+
+        logger.debug(
+            f"File written successfully: {json_size} bytes"
+        )
+
+        # Compress and upload to S3
         _compress_and_upload_file(fname)
+
+        duration = time.time() - start_time
+        logger.info(
+            f"Events written and uploaded for {mode} in {duration:.2f}s - "
+            f"{arrival_count} arrivals, {departure_count} departures "
+            f"({len(list_of_dicts)} total events, {json_size} bytes)"
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Error writing events for {mode}: {e}",
+            exc_info=True
+        )
+        raise

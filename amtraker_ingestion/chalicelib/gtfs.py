@@ -9,7 +9,10 @@ import polars as pl
 from pathlib import Path
 import requests
 from datetime import datetime
-from chalicelib.config import s3_client
+from chalicelib.config import s3_client, get_logger
+import time
+
+logger = get_logger(__name__)
 
 
 def load_gtfs_stop_times(gtfs_dir: str) -> pl.DataFrame:
@@ -241,17 +244,26 @@ def get_gtfs_last_modified(url: str) -> datetime | None:
     Args:
         url (str): The URL of the GTFS feed (zip file).
     Returns:
-        datetime | None: The last modified date in UTC, or None if unavailable.
+        datetime | None: The last modified date in UTC, or None if
+        unavailable.
     """
+    logger.debug(f"Checking last modified date for GTFS feed: {url}")
+
     try:
         response = requests.head(url, allow_redirects=True, timeout=10)
         response.raise_for_status()
 
         last_modified = response.headers.get("Last-Modified")
         if last_modified:
-            return datetime.strptime(last_modified, "%a, %d %b %Y %H:%M:%S %Z")
+            modified_date = datetime.strptime(
+                last_modified, "%a, %d %b %Y %H:%M:%S %Z"
+            )
+            logger.debug(f"GTFS feed last modified: {modified_date}")
+            return modified_date
+        else:
+            logger.warning(f"No Last-Modified header found for {url}")
     except Exception as e:
-        print(f"Error checking GTFS feed: {e}")
+        logger.error(f"Error checking GTFS feed {url}: {e}", exc_info=True)
 
     return None
 
@@ -261,11 +273,34 @@ def upload_gtfs_bundle(
     bucket_name: str,
     s3_key: str,
 ):
+    """
+    Upload a GTFS bundle zip file to S3.
+
+    Args:
+        tmp_path: Local path to the GTFS zip file
+        bucket_name: S3 bucket name
+        s3_key: S3 object key
+
+    Returns:
+        Dict with upload metadata
+    """
+    start_time = time.time()
+    file_size = tmp_path.stat().st_size
+
+    logger.info(
+        f"Uploading GTFS bundle to s3://{bucket_name}/{s3_key} "
+        f"({file_size} bytes)"
+    )
+
     try:
         s3_client.upload_file(str(tmp_path), bucket_name, s3_key)
 
-        # Optional: get file metadata
-        file_size = tmp_path.stat().st_size
+        duration = time.time() - start_time
+        logger.info(
+            f"GTFS bundle uploaded successfully in {duration:.2f}s - "
+            f"{file_size} bytes to s3://{bucket_name}/{s3_key}"
+        )
+
         return {
             "bucket": bucket_name,
             "key": s3_key,
@@ -274,10 +309,14 @@ def upload_gtfs_bundle(
         }
 
     except Exception as e:
-        print(f"Error transferring GTFS feed: {e}")
+        logger.error(
+            f"Error uploading GTFS bundle to s3://{bucket_name}/{s3_key}: {e}",
+            exc_info=True
+        )
         raise
 
     finally:
         # Clean up temp file
         if "tmp_path" in locals() and tmp_path.exists():
             tmp_path.unlink()
+            logger.debug(f"Cleaned up temporary file: {tmp_path}")
