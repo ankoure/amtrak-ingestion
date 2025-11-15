@@ -44,7 +44,9 @@ def set_last_processed():
 def get_last_processed() -> None | datetime:
     """Retrieve the last processed timestamp from S3 (or None if missing)."""
     try:
-        response = s3_client.get_object(Bucket=S3_BUCKET, Key="last_checked.json")
+        response = s3_client.get_object(
+            Bucket=S3_BUCKET, Key="last_checked.json"
+        )
         body = response["Body"].read().decode("utf-8")
         time_dict = json.loads(body)
         timestamp_str = time_dict.get("datetime")

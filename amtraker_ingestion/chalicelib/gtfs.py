@@ -39,7 +39,8 @@ def load_gtfs_stop_times(gtfs_dir: str) -> pl.DataFrame:
 
     # Load trips.txt to get route_id and direction_id
     trips = pl.read_csv(
-        gtfs_path / "trips.txt", columns=["trip_id", "route_id", "direction_id"]
+        gtfs_path / "trips.txt",
+        columns=["trip_id", "route_id", "direction_id"],
     )
 
     # Join stop_times with trips to get route and direction info
@@ -176,7 +177,9 @@ def calculate_gtfs_metrics(gtfs_dir: str) -> pl.DataFrame:
     return gtfs_stops
 
 
-def generate_direction_lookup(GTFS_DIR: str) -> tuple[pl.DataFrame, pl.DataFrame]:
+def generate_direction_lookup(
+    GTFS_DIR: str,
+) -> tuple[pl.DataFrame, pl.DataFrame]:
     """
     Generate lookup DataFrames from GTFS data with primary and secondary keys.
 
@@ -211,15 +214,23 @@ def generate_direction_lookup(GTFS_DIR: str) -> tuple[pl.DataFrame, pl.DataFrame
     trips_with_stops = trips_df.join(last_stops, on="trip_id", how="left")
 
     # Secondary lookup: headsign_stop_id -> direction_id
-    secondary_df = trips_with_stops.select(["headsign_stop_id", "direction_id"])
-    secondary_df = secondary_df.filter(pl.col("headsign_stop_id").is_not_null())
-    secondary_df = secondary_df.unique(subset=["headsign_stop_id"], keep="first")
+    secondary_df = trips_with_stops.select(
+        ["headsign_stop_id", "direction_id"]
+    )
+    secondary_df = secondary_df.filter(
+        pl.col("headsign_stop_id").is_not_null()
+    )
+    secondary_df = secondary_df.unique(
+        subset=["headsign_stop_id"], keep="first"
+    )
 
     return primary_df, secondary_df
 
 
 def generate_direction_on_custom_headsign(
-    df: pl.DataFrame, lookup: dict[str, int], headsign_code_col: str = "destCode"
+    df: pl.DataFrame,
+    lookup: dict[str, int],
+    headsign_code_col: str = "destCode",
 ) -> pl.DataFrame:
     """
     Generate Direction IDs based on headsign and lookup. Meant for providers1
@@ -288,8 +299,7 @@ def upload_gtfs_bundle(
     file_size = tmp_path.stat().st_size
 
     logger.info(
-        f"Uploading GTFS bundle to s3://{bucket_name}/{s3_key} "
-        f"({file_size} bytes)"
+        f"Uploading GTFS bundle to s3://{bucket_name}/{s3_key} ({file_size} bytes)"
     )
 
     try:
@@ -311,7 +321,7 @@ def upload_gtfs_bundle(
     except Exception as e:
         logger.error(
             f"Error uploading GTFS bundle to s3://{bucket_name}/{s3_key}: {e}",
-            exc_info=True
+            exc_info=True,
         )
         raise
 

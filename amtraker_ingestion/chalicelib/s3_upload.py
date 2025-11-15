@@ -31,7 +31,7 @@ def get_s3_json(bucket_name: str, key: str) -> dict:
     except Exception as e:
         logger.error(
             f"Failed to download JSON from s3://{bucket_name}/{key}: {e}",
-            exc_info=True
+            exc_info=True,
         )
         raise
 
@@ -49,16 +49,14 @@ def set_s3_json(data: dict, bucket_name: str, key: str):
             Bucket=bucket_name,
             Key=key,
             Body=json_bytes,
-            ContentType="application/json"
+            ContentType="application/json",
         )
 
-        logger.debug(
-            f"Successfully uploaded JSON: {len(json_bytes)} bytes"
-        )
+        logger.debug(f"Successfully uploaded JSON: {len(json_bytes)} bytes")
     except Exception as e:
         logger.error(
             f"Failed to upload JSON to s3://{bucket_name}/{key}: {e}",
-            exc_info=True
+            exc_info=True,
         )
         raise
 
@@ -89,7 +87,9 @@ def _compress_and_upload_file(fp: str):
         rp = os.path.relpath(fp, DATA_DIR)
     s3_key = S3_DATA_TEMPLATE.format(relative_path=rp)
 
-    logger.debug(f"Compressing and uploading: {fp} -> s3://{S3_BUCKET}/{s3_key}")
+    logger.debug(
+        f"Compressing and uploading: {fp} -> s3://{S3_BUCKET}/{s3_key}"
+    )
 
     try:
         with open(fp, "rb") as f:
@@ -111,13 +111,14 @@ def _compress_and_upload_file(fp: str):
                 Key=s3_key,
                 ExtraArgs={
                     "ContentType": content_type,
-                    "ContentEncoding": "gzip"
+                    "ContentEncoding": "gzip",
                 },
             )
 
         compression_ratio = (
             100 * (1 - compressed_size / original_size)
-            if original_size > 0 else 0
+            if original_size > 0
+            else 0
         )
         duration = time.time() - start_time
 
@@ -130,9 +131,8 @@ def _compress_and_upload_file(fp: str):
 
     except Exception as e:
         logger.error(
-            f"Failed to compress and upload {fp} to s3://{S3_BUCKET}/"
-            f"{s3_key}: {e}",
-            exc_info=True
+            f"Failed to compress and upload {fp} to s3://{S3_BUCKET}/{s3_key}: {e}",
+            exc_info=True,
         )
         raise
 

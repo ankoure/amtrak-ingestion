@@ -195,10 +195,7 @@ def generate_event_data():
         )
 
     except Exception as e:
-        logger.error(
-            f"Error during event data generation: {e}",
-            exc_info=True
-        )
+        logger.error(f"Error during event data generation: {e}", exc_info=True)
         raise
 
 
@@ -216,9 +213,7 @@ def check_gtfs_bundle_loop():
         logger.debug("Loaded GTFS cache metadata from S3")
     except Exception as e:
         # Cache file doesn't exist yet - initialize empty cache
-        logger.info(
-            f"GTFS cache metadata not found, initializing: {e}"
-        )
+        logger.info(f"GTFS cache metadata not found, initializing: {e}")
         cache_data = {}
 
     cache_updated = False
@@ -238,7 +233,10 @@ def check_gtfs_bundle_loop():
             )
             all_up_to_date = False
             break
-        if agency not in cache_data or "last_modified" not in cache_data[agency]:
+        if (
+            agency not in cache_data
+            or "last_modified" not in cache_data[agency]
+        ):
             logger.debug(f"No cache entry found for {agency}")
             all_up_to_date = False
             break
@@ -264,7 +262,10 @@ def check_gtfs_bundle_loop():
             # Convert datetime to ISO format string for JSON storage
             last_modified_str = last_modified_date.isoformat()
 
-            if agency not in cache_data or "last_modified" not in cache_data[agency]:
+            if (
+                agency not in cache_data
+                or "last_modified" not in cache_data[agency]
+            ):
                 # No cache entry - download the bundle
                 logger.info(f"Downloading {agency} GTFS bundle (new)")
                 download_start = time.time()
@@ -292,7 +293,9 @@ def check_gtfs_bundle_loop():
                     logger.info(f"Downloading {agency} GTFS bundle (update)")
                     download_start = time.time()
 
-                    local_filename, headers = urllib.request.urlretrieve(bundle)
+                    local_filename, headers = urllib.request.urlretrieve(
+                        bundle
+                    )
                     upload_gtfs_bundle(
                         Path(local_filename), S3_BUCKET, f"GTFS/{agency}.zip"
                     )
@@ -341,10 +344,7 @@ def collate_amtraker_data_for_date(
     # Construct the S3 prefix for the specified day
     # Convert mode to string if it's a Provider enum
     mode_str = str(mode)
-    prefix = (
-        f"Events-live/data/raw/{mode_str}/"
-        f"Year={year}/Month={month:02d}/Day={day:02d}/"
-    )
+    prefix = f"Events-live/raw/{mode_str}/Year={year}/Month={month:02d}/Day={day:02d}/"
     logger.debug(f"S3 prefix: {prefix}")
 
     all_events = []
@@ -364,7 +364,8 @@ def collate_amtraker_data_for_date(
 
         file_count = len(response["Contents"])
         json_file_count = sum(
-            1 for obj in response["Contents"]
+            1
+            for obj in response["Contents"]
             if obj["Key"].endswith(".json.gz")
         )
         logger.info(
@@ -391,8 +392,21 @@ def collate_amtraker_data_for_date(
             decompressed_data = gzip.decompress(compressed_data)
             decompressed_size = len(decompressed_data)
 
+            # Skip empty files
+            if decompressed_size == 0:
+                logger.debug(f"Skipping empty file: {key}")
+                continue
+
             # Parse JSON
-            events = json.loads(decompressed_data.decode("utf-8"))
+            try:
+                decoded_data = decompressed_data.decode("utf-8").strip()
+                if not decoded_data:
+                    logger.debug(f"Skipping file with empty content: {key}")
+                    continue
+                events = json.loads(decoded_data)
+            except json.JSONDecodeError as e:
+                logger.warning(f"Skipping file with invalid JSON ({key}): {e}")
+                continue
 
             # Add all events from this file to our collection
             if isinstance(events, list):
@@ -416,7 +430,7 @@ def collate_amtraker_data_for_date(
     except Exception as e:
         logger.error(
             f"Error collating data for {mode} on {date_str}: {e}",
-            exc_info=True
+            exc_info=True,
         )
         raise
 
@@ -498,8 +512,7 @@ def collate_amtraker_data():
 
         except Exception as e:
             logger.error(
-                f"Error collating {provider} data: {e}",
-                exc_info=True
+                f"Error collating {provider} data: {e}", exc_info=True
             )
 
     total_duration = time.time() - start_time

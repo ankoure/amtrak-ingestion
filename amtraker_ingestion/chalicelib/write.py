@@ -45,10 +45,14 @@ def add_service_dates(enriched_df: pl.DataFrame) -> pl.DataFrame:
     df_with_dates = enriched_df.with_columns(
         [
             pl.col("arr")
-            .map_elements(calculate_service_date_from_datetime, return_dtype=pl.Utf8)
+            .map_elements(
+                calculate_service_date_from_datetime, return_dtype=pl.Utf8
+            )
             .alias("service_date_arr"),
             pl.col("dep")
-            .map_elements(calculate_service_date_from_datetime, return_dtype=pl.Utf8)
+            .map_elements(
+                calculate_service_date_from_datetime, return_dtype=pl.Utf8
+            )
             .alias("service_date_dep"),
         ]
     )
@@ -70,9 +74,7 @@ def write_amtraker_events(
     """
     start_time = time.time()
     input_rows = len(enriched_df)
-    logger.info(
-        f"Writing events for {mode}: {input_rows} input rows"
-    )
+    logger.info(f"Writing events for {mode}: {input_rows} input rows")
 
     # Add service_date columns first
     df_with_service_dates = add_service_dates(enriched_df)
@@ -157,9 +159,7 @@ def write_amtraker_events(
         with open(fname, "w") as file:
             file.write(json_string)
 
-        logger.debug(
-            f"File written successfully: {json_size} bytes"
-        )
+        logger.debug(f"File written successfully: {json_size} bytes")
 
         # Compress and upload to S3
         _compress_and_upload_file(fname)
@@ -172,8 +172,5 @@ def write_amtraker_events(
         )
 
     except Exception as e:
-        logger.error(
-            f"Error writing events for {mode}: {e}",
-            exc_info=True
-        )
+        logger.error(f"Error writing events for {mode}: {e}", exc_info=True)
         raise

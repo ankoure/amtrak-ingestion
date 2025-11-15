@@ -117,8 +117,7 @@ def add_scheduled_metrics(
     start_time = time.time()
     input_rows = len(amtraker_df)
     logger.debug(
-        f"Adding scheduled metrics to {input_rows} rows using GTFS: "
-        f"{gtfs_dir}"
+        f"Adding scheduled metrics to {input_rows} rows using GTFS: {gtfs_dir}"
     )
 
     # Calculate GTFS metrics (includes scheduled_headway and scheduled_tt)
@@ -127,9 +126,7 @@ def add_scheduled_metrics(
 
     # Aggregate GTFS metrics by stop and direction to get average values
     # This prevents cartesian product from multiple trips
-    gtfs_aggregated = gtfs_metrics.group_by(
-        ["stop_id", "direction_id"]
-    ).agg(
+    gtfs_aggregated = gtfs_metrics.group_by(["stop_id", "direction_id"]).agg(
         [
             pl.col("scheduled_headway").mean().alias("scheduled_headway"),
             pl.col("scheduled_tt").mean().alias("scheduled_tt"),

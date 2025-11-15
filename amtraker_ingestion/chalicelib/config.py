@@ -7,6 +7,7 @@ import sys
 if "AWS_EXECUTION_ENV" not in os.environ:
     try:
         from dotenv import load_dotenv
+
         load_dotenv()
     except ImportError:
         pass
@@ -53,8 +54,8 @@ def setup_logging():
     # CloudWatch-friendly format with structured data support
     # Format: timestamp - level - logger_name - message - extra_fields
     formatter = logging.Formatter(
-        fmt='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        fmt="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
     handler.setFormatter(formatter)
 
@@ -62,9 +63,9 @@ def setup_logging():
     root_logger.addHandler(handler)
 
     # Silence noisy AWS SDK logs
-    logging.getLogger('boto3').setLevel(logging.WARNING)
-    logging.getLogger('botocore').setLevel(logging.WARNING)
-    logging.getLogger('urllib3').setLevel(logging.WARNING)
+    logging.getLogger("boto3").setLevel(logging.WARNING)
+    logging.getLogger("botocore").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
 
     return root_logger
 

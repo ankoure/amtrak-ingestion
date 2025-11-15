@@ -46,7 +46,9 @@ def validate_amtraker_data(amtraker_api_url: str) -> TrainResponse:
         validation_duration = time.time() - validation_start
 
         # Count trains in response
-        train_count = sum(len(trains) for trains in validated_data.root.values())
+        train_count = sum(
+            len(trains) for trains in validated_data.root.values()
+        )
 
         logger.info(
             f"API response validated in {validation_duration:.2f}s - "
@@ -58,13 +60,13 @@ def validate_amtraker_data(amtraker_api_url: str) -> TrainResponse:
     except requests.RequestException as e:
         logger.error(
             f"HTTP request failed after {time.time() - start_time:.2f}s: {e}",
-            exc_info=True
+            exc_info=True,
         )
         raise
     except ValidationError as e:
         logger.error(
             f"Validation error while processing Amtraker data: {e}",
-            exc_info=True
+            exc_info=True,
         )
         raise
 
@@ -166,7 +168,9 @@ def remove_excess_columns_from_stations(
 
 def remove_bus(polars_df: pl.DataFrame) -> pl.DataFrame:
     # Filter to only include rows where bus is False
-    new_df = polars_df.filter(~pl.col("bus") & (pl.col("status") == "Departed"))
+    new_df = polars_df.filter(
+        ~pl.col("bus") & (pl.col("status") == "Departed")
+    )
     return new_df
 
 

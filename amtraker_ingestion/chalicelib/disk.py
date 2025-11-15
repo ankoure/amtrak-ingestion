@@ -57,7 +57,9 @@ def write_event(event: dict, mode: Provider | str = Provider.AMTRAK):
     pathname = dirname / CSV_FILENAME
     file_exists = os.path.isfile(pathname)
     with pathname.open("a") as fd:
-        writer = csv.DictWriter(fd, fieldnames=CSV_FIELDS, extrasaction="ignore")
+        writer = csv.DictWriter(
+            fd, fieldnames=CSV_FIELDS, extrasaction="ignore"
+        )
         if not file_exists:
             writer.writeheader()
         writer.writerow(event)

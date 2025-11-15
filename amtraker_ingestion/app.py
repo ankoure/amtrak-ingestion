@@ -39,10 +39,7 @@ def update_gtfs_cache(event):
             f"Scheduled GTFS cache update completed in {duration:.2f}s"
         )
     except Exception as e:
-        logger.error(
-            f"Scheduled GTFS cache update failed: {e}",
-            exc_info=True
-        )
+        logger.error(f"Scheduled GTFS cache update failed: {e}", exc_info=True)
         raise
 
 
@@ -58,15 +55,10 @@ def manual_gtfs_update():
     try:
         check_gtfs_bundle_loop()
         duration = time.time() - start_time
-        logger.info(
-            f"Manual GTFS cache update completed in {duration:.2f}s"
-        )
+        logger.info(f"Manual GTFS cache update completed in {duration:.2f}s")
         return {"status": "completed", "duration_seconds": duration}
     except Exception as e:
-        logger.error(
-            f"Manual GTFS cache update failed: {e}",
-            exc_info=True
-        )
+        logger.error(f"Manual GTFS cache update failed: {e}", exc_info=True)
         raise
 
 
@@ -87,13 +79,11 @@ def consume_amtraker_api(event):
         generate_event_data()
         duration = time.time() - start_time
         logger.info(
-            f"Scheduled Amtraker API consumption completed in "
-            f"{duration:.2f}s"
+            f"Scheduled Amtraker API consumption completed in {duration:.2f}s"
         )
     except Exception as e:
         logger.error(
-            f"Scheduled Amtraker API consumption failed: {e}",
-            exc_info=True
+            f"Scheduled Amtraker API consumption failed: {e}", exc_info=True
         )
         raise
 
@@ -110,15 +100,10 @@ def manual_amtraker_update():
     try:
         generate_event_data()
         duration = time.time() - start_time
-        logger.info(
-            f"Manual Amtraker update completed in {duration:.2f}s"
-        )
+        logger.info(f"Manual Amtraker update completed in {duration:.2f}s")
         return {"status": "completed", "duration_seconds": duration}
     except Exception as e:
-        logger.error(
-            f"Manual Amtraker update failed: {e}",
-            exc_info=True
-        )
+        logger.error(f"Manual Amtraker update failed: {e}", exc_info=True)
         raise
 
 
@@ -138,14 +123,9 @@ def collate_previous_day(event):
     try:
         collate_previous_day_data()
         duration = time.time() - start_time
-        logger.info(
-            f"Scheduled data collation completed in {duration:.2f}s"
-        )
+        logger.info(f"Scheduled data collation completed in {duration:.2f}s")
     except Exception as e:
-        logger.error(
-            f"Scheduled data collation failed: {e}",
-            exc_info=True
-        )
+        logger.error(f"Scheduled data collation failed: {e}", exc_info=True)
         raise
 
 
@@ -180,8 +160,7 @@ def manual_collate_amtraker_data():
     mode_str = params.get("mode", "Amtrak")
 
     logger.info(
-        f"Collation parameters: year={year}, month={month}, "
-        f"day={day}, mode={mode_str}"
+        f"Collation parameters: year={year}, month={month}, day={day}, mode={mode_str}"
     )
 
     # Convert string to Provider enum if valid
@@ -197,8 +176,7 @@ def manual_collate_amtraker_data():
             collate_previous_day_data()
             duration = time.time() - start_time
             logger.info(
-                f"Manual collation (previous day) completed in "
-                f"{duration:.2f}s"
+                f"Manual collation (previous day) completed in {duration:.2f}s"
             )
             return {
                 "status": "completed",
@@ -207,15 +185,12 @@ def manual_collate_amtraker_data():
             }
         except Exception as e:
             logger.error(
-                f"Manual collation (previous day) failed: {e}",
-                exc_info=True
+                f"Manual collation (previous day) failed: {e}", exc_info=True
             )
             raise
 
     # If date specified, collate for that specific date and provider
-    logger.info(
-        f"Collating data for {year}-{month:02d}-{day:02d} ({mode})"
-    )
+    logger.info(f"Collating data for {year}-{month:02d}-{day:02d} ({mode})")
     try:
         events = collate_amtraker_data_for_date(year, month, day, mode)
         duration = time.time() - start_time
@@ -235,7 +210,7 @@ def manual_collate_amtraker_data():
     except Exception as e:
         logger.error(
             f"Manual collation for {year}-{month:02d}-{day:02d} failed: {e}",
-            exc_info=True
+            exc_info=True,
         )
         raise
 

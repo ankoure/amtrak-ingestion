@@ -55,8 +55,7 @@ def cleanup_old_gtfs_temp_dirs():
             failed_count += 1
 
     logger.info(
-        f"Cleanup completed - Removed: {removed_count}, "
-        f"Failed: {failed_count}"
+        f"Cleanup completed - Removed: {removed_count}, Failed: {failed_count}"
     )
 
 
@@ -73,8 +72,7 @@ def get_latest_gtfs_archive_from_cache(agency: str) -> str | None:
     """
     s3_key = f"GTFS/{agency}.zip"
     logger.debug(
-        f"Attempting to load {agency} GTFS from cache: "
-        f"s3://{S3_BUCKET}/{s3_key}"
+        f"Attempting to load {agency} GTFS from cache: s3://{S3_BUCKET}/{s3_key}"
     )
 
     # Create a named temporary directory
@@ -96,8 +94,7 @@ def get_latest_gtfs_archive_from_cache(agency: str) -> str | None:
             return None
         # Re-raise other errors
         logger.error(
-            f"Error downloading {agency} GTFS from cache: {e}",
-            exc_info=True
+            f"Error downloading {agency} GTFS from cache: {e}", exc_info=True
         )
         raise
 
@@ -111,8 +108,7 @@ def get_latest_gtfs_archive_from_cache(agency: str) -> str | None:
         )
     except Exception as e:
         logger.error(
-            f"Error extracting {agency} GTFS archive: {e}",
-            exc_info=True
+            f"Error extracting {agency} GTFS archive: {e}", exc_info=True
         )
         raise
 
@@ -136,9 +132,7 @@ def get_latest_gtfs_archive(GTFS_URL: str) -> str:
 
     try:
         # Download the GTFS zip file to a temporary location
-        gtfs_zip, _ = urlretrieve(
-            GTFS_URL, os.path.join(temp_dir, "gtfs.zip")
-        )
+        gtfs_zip, _ = urlretrieve(GTFS_URL, os.path.join(temp_dir, "gtfs.zip"))
         zip_size = os.path.getsize(gtfs_zip)
         logger.info(f"Downloaded GTFS archive: {zip_size} bytes")
 
@@ -153,7 +147,7 @@ def get_latest_gtfs_archive(GTFS_URL: str) -> str:
     except Exception as e:
         logger.error(
             f"Error downloading/extracting GTFS from {GTFS_URL}: {e}",
-            exc_info=True
+            exc_info=True,
         )
         raise
 
