@@ -6,6 +6,9 @@
     "dev": {
       "api_gateway_stage": "api",
       "autogen_policy": false,
+      "iam_policy_file": "policy-amtraker-ingest.json",
+      "lambda_memory_size": 2048,
+      "lambda_timeout": 900,
       "tags": {
         "service": "mbta-performance",
         "env": "dev"
@@ -31,6 +34,9 @@
     "prod": {
       "api_gateway_stage": "api",
       "autogen_policy": false,
+      "iam_policy_file": "policy-lamp-ingest.json",
+      "lambda_memory_size": 2048,
+      "lambda_timeout": 900,
       "tags": {
         "service": "mbta-performance",
         "env": "prod"

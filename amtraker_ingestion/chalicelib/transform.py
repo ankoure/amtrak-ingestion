@@ -22,6 +22,9 @@ def add_direction_id(amtraker_df: pl.DataFrame, gtfs_dir: str) -> pl.DataFrame:
     """
     start_time = time.time()
     input_rows = len(amtraker_df)
+    if input_rows == 0:
+        logger.info("No rows to enrich with direction_id")
+        return amtraker_df
     logger.debug(
         f"Adding direction_id to {input_rows} rows using GTFS: {gtfs_dir}"
     )
@@ -116,6 +119,9 @@ def add_scheduled_metrics(
     """
     start_time = time.time()
     input_rows = len(amtraker_df)
+    if input_rows == 0:
+        logger.info("No rows to enrich with scheduled metrics")
+        return amtraker_df
     logger.debug(
         f"Adding scheduled metrics to {input_rows} rows using GTFS: {gtfs_dir}"
     )

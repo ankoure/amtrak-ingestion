@@ -36,7 +36,7 @@ from chalicelib.s3_upload import (
     _compress_and_upload_file,
 )
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from chalicelib.disk import write_event
 import glob
 import gzip
@@ -446,8 +446,8 @@ def collate_amtraker_data():
     start_time = time.time()
     logger.info("Starting daily data collation")
 
-    # Get yesterday's date
-    yesterday = datetime.now(EASTERN_TIME) - timedelta(days=1)
+    # Get yesterday's date (use UTC to avoid timezone issues with cron schedule)
+    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
     year = yesterday.year
     month = yesterday.month
     day = yesterday.day
