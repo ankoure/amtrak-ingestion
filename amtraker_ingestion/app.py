@@ -2,9 +2,8 @@ from chalice.app import Chalice, Cron
 from chalicelib.main import (
     check_gtfs_bundle_loop,
     generate_event_data,
-    collate_amtraker_data as collate_previous_day_data,
+    collate_amtraker_data,
 )
-from chalicelib.main import collate_amtraker_data_for_date
 from chalicelib.constants import Provider
 from chalicelib.config import get_logger
 import time
@@ -121,7 +120,7 @@ def collate_previous_day(event):
     start_time = time.time()
 
     try:
-        collate_previous_day_data()
+        collate_amtraker_data()
         duration = time.time() - start_time
         logger.info(f"Scheduled data collation completed in {duration:.2f}s")
     except Exception as e:
@@ -173,7 +172,7 @@ def manual_collate_amtraker_data():
     if not all([year, month, day]):
         logger.info("No date specified, collating previous day")
         try:
-            collate_previous_day_data()
+            result = collate_amtraker_data()
             duration = time.time() - start_time
             logger.info(
                 f"Manual collation (previous day) completed in {duration:.2f}s"
@@ -181,6 +180,8 @@ def manual_collate_amtraker_data():
             return {
                 "status": "completed",
                 "message": "Collated previous day's data for all providers",
+                "events_count": result["events_count"],
+                "files_uploaded": result["files_uploaded"],
                 "duration_seconds": duration,
             }
         except Exception as e:
@@ -192,15 +193,17 @@ def manual_collate_amtraker_data():
     # If date specified, collate for that specific date and provider
     logger.info(f"Collating data for {year}-{month:02d}-{day:02d} ({mode})")
     try:
-        events = collate_amtraker_data_for_date(year, month, day, mode)
+        result = collate_amtraker_data(year, month, day, mode)
         duration = time.time() - start_time
         logger.info(
             f"Manual collation for {year}-{month:02d}-{day:02d} "
-            f"completed in {duration:.2f}s - {len(events)} events"
+            f"completed in {duration:.2f}s - {result['events_count']} events, "
+            f"{result['files_uploaded']} files uploaded"
         )
         return {
             "status": "completed",
-            "events_count": len(events),
+            "events_count": result["events_count"],
+            "files_uploaded": result["files_uploaded"],
             "year": year,
             "month": month,
             "day": day,

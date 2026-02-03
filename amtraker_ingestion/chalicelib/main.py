@@ -18,7 +18,6 @@ from chalicelib.constants import (
     VIA_RAIL_STATIC_GTFS,
     BRIGHTLINE_STATIC_GTFS,
     S3_BUCKET,
-    EASTERN_TIME,
     LOCAL_DATA_TEMPLATE,
     Provider,
 )
@@ -437,31 +436,54 @@ def collate_amtraker_data_for_date(
     return all_events
 
 
-def collate_amtraker_data():
+def collate_amtraker_data(
+    year: int | None = None,
+    month: int | None = None,
+    day: int | None = None,
+    provider: Provider | str | None = None,
+) -> dict:
     """
-    Collate the previous day's data for all providers.
-    Writes out the collated data as gzipped CSVs and uploads to S3.
-    This is meant to be called by the scheduled cron job.
+    Collate data, write to disk, and upload to S3.
+
+    Args:
+        year: Year (e.g., 2025). If None, uses yesterday's date.
+        month: Month (1-12). If None, uses yesterday's date.
+        day: Day of month (1-31). If None, uses yesterday's date.
+        provider: Provider enum or string. If None, processes all enabled providers.
+
+    Returns:
+        Dict with events_count and files_uploaded
     """
     start_time = time.time()
-    logger.info("Starting daily data collation")
+    logger.info("Starting data collation")
 
-    # Get yesterday's date (use UTC to avoid timezone issues with cron schedule)
-    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
-    year = yesterday.year
-    month = yesterday.month
-    day = yesterday.day
+    # Use yesterday's date if not specified (UTC to avoid timezone issues)
+    if year is None or month is None or day is None:
+        yesterday = datetime.now(timezone.utc) - timedelta(days=1)
+        year = year or yesterday.year
+        month = month or yesterday.month
+        day = day or yesterday.day
 
     logger.info(f"Collating data for date: {year}-{month:02d}-{day:02d}")
 
-    # Collate data for each provider
-    providers = []
-    if AMTRAK_ENABLED:
-        providers.append(Provider.AMTRAK)
-    if VIA_ENABLED:
-        providers.append(Provider.VIA)
-    if BRIGHTLINE_ENABLED:
-        providers.append(Provider.BRIGHTLINE)
+    # Determine which providers to process
+    if provider is not None:
+        # Convert string to Provider if needed
+        if isinstance(provider, str):
+            try:
+                provider = Provider(provider)
+            except ValueError:
+                pass  # Keep as string if not a valid Provider
+        providers = [provider]
+    else:
+        # Process all enabled providers
+        providers = []
+        if AMTRAK_ENABLED:
+            providers.append(Provider.AMTRAK)
+        if VIA_ENABLED:
+            providers.append(Provider.VIA)
+        if BRIGHTLINE_ENABLED:
+            providers.append(Provider.BRIGHTLINE)
 
     logger.info(f"Providers to collate: {[str(p) for p in providers]}")
 
@@ -469,7 +491,6 @@ def collate_amtraker_data():
     total_uploads = 0
 
     for provider in providers:
-        provider_start = time.time()
         try:
             # Get all events for the day
             events = collate_amtraker_data_for_date(year, month, day, provider)
@@ -492,17 +513,15 @@ def collate_amtraker_data():
 
             uploaded_count = 0
             upload_start = time.time()
+            provider_str = str(provider)
             for fp in files_for_day:
-                # Check if file belongs to this provider by checking the path
-                provider_str = str(provider)
                 if f"daily-{provider_str}-data" in fp:
                     _compress_and_upload_file(fp)
                     uploaded_count += 1
             upload_duration = time.time() - upload_start
 
-            provider_duration = time.time() - provider_start
             logger.info(
-                f"{provider} collation completed in {provider_duration:.2f}s - "
+                f"{provider} collation completed - "
                 f"{len(events)} events, {uploaded_count} files uploaded "
                 f"(upload took {upload_duration:.2f}s)"
             )
@@ -517,9 +536,14 @@ def collate_amtraker_data():
 
     total_duration = time.time() - start_time
     logger.info(
-        f"Daily data collation completed in {total_duration:.2f}s - "
+        f"Data collation completed in {total_duration:.2f}s - "
         f"{total_events} total events, {total_uploads} files uploaded"
     )
+
+    return {
+        "events_count": total_events,
+        "files_uploaded": total_uploads,
+    }
 
 
 if __name__ == "__main__":
