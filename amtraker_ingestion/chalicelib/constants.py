@@ -1,10 +1,40 @@
+"""
+Constants and Configuration Values
+===================================
+
+This module defines constants used throughout the Amtrak Ingestion system,
+including API endpoints, S3 bucket names, file paths, and data schemas.
+
+Attributes
+----------
+AMTRAKER_API : str
+    URL for the Amtraker trains API endpoint.
+S3_BUCKET : str
+    Name of the S3 bucket for data storage.
+CSV_FIELDS : list of str
+    Field names for event CSV files.
+EASTERN_TIME : ZoneInfo
+    Eastern timezone for service date calculations.
+"""
+
 from zoneinfo import ZoneInfo
 import pathlib
 from enum import Enum
 
 
 class Provider(str, Enum):
-    """Standardized provider names for transit agencies."""
+    """
+    Enum of supported transit providers.
+
+    Attributes
+    ----------
+    AMTRAK : str
+        Amtrak national passenger railroad.
+    VIA : str
+        VIA Rail Canada.
+    BRIGHTLINE : str
+        Brightline Florida high-speed rail.
+    """
 
     AMTRAK = "Amtrak"
     VIA = "VIA"

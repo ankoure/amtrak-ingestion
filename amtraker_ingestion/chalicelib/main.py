@@ -1,3 +1,20 @@
+"""
+Main Pipeline Orchestration Module
+===================================
+
+This module contains the core pipeline functions for the Amtrak Ingestion system.
+It orchestrates the entire data flow from API ingestion through enrichment to storage.
+
+Main Functions
+--------------
+generate_event_data
+    Main entry point for real-time event generation
+check_gtfs_bundle_loop
+    Checks and updates GTFS bundles for all providers
+collate_amtraker_data
+    Collates daily data from S3 into organized CSV files
+"""
+
 from pathlib import Path
 from chalicelib.read import read_amtraker_data
 from chalicelib.transform import add_direction_id, add_scheduled_metrics
@@ -47,8 +64,32 @@ logger = get_logger(__name__)
 
 def generate_event_data():
     """
-    Main function to generate event data from Amtraker API.
-    Reads, enriches, and writes events for all enabled providers.
+    Generate event data from Amtraker API for all enabled providers.
+
+    This is the main entry point for the real-time data pipeline. It performs
+    the following steps for each enabled provider:
+
+    1. Fetches current train data from the Amtraker API
+    2. Retrieves GTFS data from cache or downloads if needed
+    3. Enriches data with direction IDs from GTFS
+    4. Adds scheduled metrics (headway and travel time)
+    5. Calculates service dates for events
+    6. Writes arrival and departure events to files
+    7. Uploads compressed data to S3
+
+    Raises
+    ------
+    Exception
+        If any critical error occurs during processing.
+
+    Notes
+    -----
+    Provider enablement is controlled by flags in the config module:
+    ``AMTRAK_ENABLED``, ``VIA_ENABLED``, ``BRIGHTLINE_ENABLED``.
+
+    Examples
+    --------
+    >>> generate_event_data()  # Processes all enabled providers
     """
     start_time = time.time()
     logger.info("Starting event data generation")
@@ -200,8 +241,31 @@ def generate_event_data():
 
 def check_gtfs_bundle_loop():
     """
-    Check and update GTFS bundles for all providers.
-    Downloads new bundles if they've been updated since last check.
+    Check and update GTFS bundles for all transit providers.
+
+    This function checks the Last-Modified header of each provider's GTFS feed
+    and downloads updated bundles if they have changed since the last check.
+    Updated bundles are uploaded to S3 for caching.
+
+    The function maintains a cache metadata file in S3 at
+    ``GTFS/last_modified.json`` that tracks the last modified date for each
+    provider's GTFS bundle.
+
+    Providers Checked
+    -----------------
+    - Amtrak: National passenger railroad GTFS
+    - VIA Rail: Canadian passenger railroad GTFS
+    - Brightline: Florida high-speed rail GTFS
+
+    Notes
+    -----
+    This function performs an early exit optimization: if all bundles are
+    up-to-date based on the cache, no downloads are performed.
+
+    See Also
+    --------
+    get_gtfs_last_modified : Gets Last-Modified header from GTFS URL
+    upload_gtfs_bundle : Uploads GTFS zip file to S3
     """
     start_time = time.time()
     logger.info("Starting GTFS bundle check")
@@ -326,16 +390,41 @@ def collate_amtraker_data_for_date(
     year: int, month: int, day: int, mode: Provider | str = Provider.AMTRAK
 ) -> list[dict]:
     """
-    Collect all gzipped JSON data for a specified day from S3 into a list of dicts.
+    Collect all gzipped JSON data for a specified day from S3.
 
-    Args:
-        year: Year (e.g., 2025)
-        month: Month (1-12)
-        day: Day of month (1-31)
-        mode: Provider name (e.g., "amtrak", "via", "brightline")
+    Downloads and decompresses all JSON event files stored in S3 for a given
+    date and provider, returning them as a list of event dictionaries.
 
-    Returns:
-        List of event dictionaries from all JSON files for that day
+    Parameters
+    ----------
+    year : int
+        Four-digit year (e.g., 2025).
+    month : int
+        Month number (1-12).
+    day : int
+        Day of month (1-31).
+    mode : Provider or str, default Provider.AMTRAK
+        Transit provider to collate data for.
+
+    Returns
+    -------
+    list of dict
+        List of event dictionaries from all JSON files for that day.
+        Each dict contains event fields like service_date, route_id,
+        trip_id, direction_id, stop_id, event_type, event_time, etc.
+
+    Notes
+    -----
+    The S3 path structure is:
+    ``Events-live/raw/{Provider}/Year={year}/Month={mm}/Day={dd}/``
+
+    Invalid JSON files are skipped with a warning logged.
+
+    Examples
+    --------
+    >>> events = collate_amtraker_data_for_date(2025, 11, 15, Provider.AMTRAK)
+    >>> len(events)
+    1500
     """
     date_str = f"{year}-{month:02d}-{day:02d}"
     logger.info(f"Collating data for {mode} on {date_str}")
@@ -443,16 +532,47 @@ def collate_amtraker_data(
     provider: Provider | str | None = None,
 ) -> dict:
     """
-    Collate data, write to disk, and upload to S3.
+    Collate daily event data, write to CSV files, and upload to S3.
 
-    Args:
-        year: Year (e.g., 2025). If None, uses yesterday's date.
-        month: Month (1-12). If None, uses yesterday's date.
-        day: Day of month (1-31). If None, uses yesterday's date.
-        provider: Provider enum or string. If None, processes all enabled providers.
+    This function orchestrates the daily data collation process:
 
-    Returns:
-        Dict with events_count and files_uploaded
+    1. Downloads all raw JSON event files from S3 for the specified date
+    2. Writes events to CSV files organized by route/direction/stop
+    3. Compresses and uploads CSV files back to S3
+
+    Parameters
+    ----------
+    year : int, optional
+        Four-digit year. If None, uses yesterday's date.
+    month : int, optional
+        Month number (1-12). If None, uses yesterday's date.
+    day : int, optional
+        Day of month (1-31). If None, uses yesterday's date.
+    provider : Provider or str, optional
+        Specific provider to collate. If None, processes all enabled providers.
+
+    Returns
+    -------
+    dict
+        Summary with keys:
+        - ``events_count``: Total number of events processed
+        - ``files_uploaded``: Number of CSV files uploaded to S3
+
+    Notes
+    -----
+    The output CSV files are organized in S3 as:
+    ``Events-live/daily-{Provider}-data/{route}_{direction}_{stop}/Year=.../``
+
+    Examples
+    --------
+    Collate yesterday's data for all providers:
+
+    >>> result = collate_amtraker_data()
+    >>> print(f"Processed {result['events_count']} events")
+
+    Collate specific date for Amtrak only:
+
+    >>> result = collate_amtraker_data(2025, 11, 15, Provider.AMTRAK)
     """
     start_time = time.time()
     logger.info("Starting data collation")

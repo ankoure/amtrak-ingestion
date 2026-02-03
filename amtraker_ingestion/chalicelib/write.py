@@ -1,3 +1,20 @@
+"""
+Event Generation and Writing Module
+====================================
+
+This module handles the generation of arrival and departure events from
+enriched train data and writes them to files for upload to S3.
+
+Main Functions
+--------------
+write_amtraker_events
+    Generates and writes arrival/departure events to JSON files
+add_service_dates
+    Adds service date columns for arrivals and departures
+calculate_service_date_from_datetime
+    Calculates the service date from a datetime object
+"""
+
 import polars as pl
 from datetime import datetime, timezone
 from chalicelib.disk import service_date

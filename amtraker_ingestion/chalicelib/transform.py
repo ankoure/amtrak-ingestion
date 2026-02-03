@@ -1,3 +1,18 @@
+"""
+Data Transformation and Enrichment Module
+==========================================
+
+This module enriches raw Amtraker data with GTFS schedule information,
+including direction IDs, scheduled headways, and travel times.
+
+Main Functions
+--------------
+add_direction_id
+    Adds GTFS direction IDs using primary and secondary lookup strategies
+add_scheduled_metrics
+    Adds scheduled headway and travel time from GTFS data
+"""
+
 import polars as pl
 import time
 
@@ -9,16 +24,33 @@ logger = get_logger(__name__)
 
 def add_direction_id(amtraker_df: pl.DataFrame, gtfs_dir: str) -> pl.DataFrame:
     """
-    Enrich Amtraker train data with GTFS information like direction_id.
-    Uses primary lookup by trainNumRaw, falls back to secondary lookup by
-    destCode (destination stop_id).
+    Enrich Amtraker train data with GTFS direction IDs.
 
-    Args:
-        amtraker_df: Polars DataFrame with train data
-        gtfs_dir: Path to extracted GTFS directory
+    Uses a two-stage lookup strategy:
 
-    Returns:
-        Polars DataFrame enriched with direction_id and lookup_method columns
+    1. **Primary lookup**: Match ``trainNumRaw`` to GTFS ``trip_short_name``
+    2. **Secondary lookup**: Match ``destCode`` to GTFS headsign stop ID
+
+    Parameters
+    ----------
+    amtraker_df : polars.DataFrame
+        DataFrame with train data, must contain ``trainNumRaw`` and
+        ``destCode`` columns.
+    gtfs_dir : str
+        Path to extracted GTFS directory containing trips.txt and
+        stop_times.txt.
+
+    Returns
+    -------
+    polars.DataFrame
+        Input DataFrame enriched with:
+
+        - ``direction_id``: GTFS direction (0 or 1), or None if not found
+        - ``lookup_method``: "primary", "secondary", or None
+
+    See Also
+    --------
+    generate_direction_lookup : Generates the lookup DataFrames from GTFS
     """
     start_time = time.time()
     input_rows = len(amtraker_df)
@@ -106,16 +138,39 @@ def add_scheduled_metrics(
     amtraker_df: pl.DataFrame, gtfs_dir: str
 ) -> pl.DataFrame:
     """
-    Add scheduled headway and travel time metrics from GTFS to Amtraker data.
+    Add scheduled headway and travel time metrics from GTFS.
 
-    Args:
-        amtraker_df: Polars DataFrame with train data
-                     (must have direction_id column)
-        gtfs_dir: Path to extracted GTFS directory
+    Enriches train data with schedule-based metrics calculated from GTFS:
 
-    Returns:
-        Polars DataFrame enriched with scheduled_headway and
-        scheduled_tt columns
+    - **Scheduled headway**: Expected time between consecutive vehicles
+      at the same stop
+    - **Scheduled travel time**: Expected elapsed time from trip start
+      to each stop
+
+    Parameters
+    ----------
+    amtraker_df : polars.DataFrame
+        DataFrame with train data. Must have ``code`` (stop_id) and
+        ``direction_id`` columns.
+    gtfs_dir : str
+        Path to extracted GTFS directory.
+
+    Returns
+    -------
+    polars.DataFrame
+        Input DataFrame enriched with:
+
+        - ``scheduled_headway``: Headway in seconds (integer)
+        - ``scheduled_tt``: Travel time in seconds (integer)
+
+    Notes
+    -----
+    Metrics are aggregated (averaged) across all trips at each
+    stop/direction combination to avoid cartesian product issues.
+
+    See Also
+    --------
+    calculate_gtfs_metrics : Calculates raw GTFS metrics
     """
     start_time = time.time()
     input_rows = len(amtraker_df)

@@ -1,3 +1,22 @@
+"""
+Data Reading and Ingestion Module
+==================================
+
+This module handles fetching and transforming data from the Amtraker API
+into Polars DataFrames for further processing.
+
+The main entry point is :func:`read_amtraker_data`, which orchestrates
+the complete data reading pipeline.
+
+Pipeline Steps
+--------------
+1. Fetch and validate API response with Pydantic
+2. Convert to Polars DataFrame
+3. Remove excess fields and expand nested data
+4. Filter by time and remove bus services
+5. Split by transit provider
+"""
+
 from chalicelib.timefilter import filter_events
 from chalicelib.models.amtraker import TrainResponse
 from chalicelib.config import get_logger
@@ -14,15 +33,32 @@ def validate_amtraker_data(amtraker_api_url: str) -> TrainResponse:
     """
     Fetch and validate train data from Amtraker API.
 
-    Args:
-        amtraker_api_url: URL to fetch train data from
+    Makes an HTTP GET request to the Amtraker API and validates the response
+    against the TrainResponse Pydantic model.
 
-    Returns:
-        TrainResponse containing validated Train objects
+    Parameters
+    ----------
+    amtraker_api_url : str
+        Full URL to fetch train data from.
 
-    Raises:
-        ValidationError: If the API response doesn't match the expected schema
-        requests.RequestException: If the HTTP request fails
+    Returns
+    -------
+    TrainResponse
+        Validated response containing Train objects organized by train number.
+
+    Raises
+    ------
+    pydantic.ValidationError
+        If the API response doesn't match the expected schema.
+    requests.RequestException
+        If the HTTP request fails (timeout, connection error, etc.).
+
+    Examples
+    --------
+    >>> url = "https://api-v3.amtraker.com/v3/trains"
+    >>> response = validate_amtraker_data(url)
+    >>> len(response.root)  # Number of train numbers
+    150
     """
     logger.debug(f"Fetching data from Amtraker API: {amtraker_api_url}")
     start_time = time.time()
@@ -75,9 +111,20 @@ def trainresponse_to_polars(train_response: TrainResponse) -> pl.DataFrame:
     """
     Convert TrainResponse to Polars DataFrame.
 
-    The TrainResponse is a dict mapping train numbers to lists of Train
-    objects. This flattens it into a single DataFrame with one row per
+    Flattens the hierarchical TrainResponse structure (train numbers mapping
+    to lists of Train objects) into a single DataFrame with one row per
     train instance.
+
+    Parameters
+    ----------
+    train_response : TrainResponse
+        Validated API response with train data.
+
+    Returns
+    -------
+    polars.DataFrame
+        DataFrame with one row per train, containing all train fields
+        including nested station data.
     """
     # Option 1: Using Pydantic's model_dump() and flattening
     trains_data = []

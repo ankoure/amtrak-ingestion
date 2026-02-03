@@ -1,3 +1,21 @@
+"""
+Time-based Event Filtering Module
+==================================
+
+This module provides time-based filtering of events to avoid processing
+duplicates. It tracks the last processed timestamp in S3 and filters
+events to only include those newer than this timestamp.
+
+Main Functions
+--------------
+filter_events
+    Filter DataFrame to only include events after last processed time
+get_last_processed
+    Retrieve the last processed timestamp from S3
+set_last_processed
+    Store the current time as the last processed timestamp
+"""
+
 import polars as pl
 from datetime import datetime, timezone
 from chalicelib.config import s3_client
@@ -7,14 +25,24 @@ from chalicelib.constants import S3_BUCKET
 
 def filter_events(df: pl.DataFrame, date_column: str) -> pl.DataFrame:
     """
-    This function filters the dataframe based the last processed datetime.
+    Filter DataFrame to only include events after the last processed time.
 
-    Args:
-        df (pl.DataFrame): Input Polars Dataframe.
-        date_column (str): String value representing date column name.
+    Retrieves the last processed timestamp from S3 and filters the
+    DataFrame to only include rows where the specified date column
+    is newer than this timestamp.
 
-    Returns:
-        pl.DataFrame: The filtered DataFrame or the same dataframe if the process is starting fresh.
+    Parameters
+    ----------
+    df : polars.DataFrame
+        Input DataFrame with event data.
+    date_column : str
+        Name of the datetime column to filter on (e.g., "dep").
+
+    Returns
+    -------
+    polars.DataFrame
+        Filtered DataFrame with only new events, or the original
+        DataFrame if no previous timestamp exists.
     """
     cutoff_date = get_last_processed()
     if cutoff_date:
@@ -29,7 +57,18 @@ def filter_events(df: pl.DataFrame, date_column: str) -> pl.DataFrame:
 
 
 def set_last_processed():
-    """Store the current UTC time as the last processed timestamp in S3."""
+    """
+    Store the current UTC time as the last processed timestamp in S3.
+
+    Saves the current timestamp to ``last_checked.json`` in the configured
+    S3 bucket. This timestamp is used by :func:`filter_events` to avoid
+    reprocessing events.
+
+    Returns
+    -------
+    datetime
+        The timestamp that was stored.
+    """
     current_utc_time = datetime.now(timezone.utc)
     time_dict = {"datetime": current_utc_time.isoformat()}
     s3_client.put_object(
@@ -42,7 +81,17 @@ def set_last_processed():
 
 
 def get_last_processed() -> None | datetime:
-    """Retrieve the last processed timestamp from S3 (or None if missing)."""
+    """
+    Retrieve the last processed timestamp from S3.
+
+    Reads the ``last_checked.json`` file from S3 and returns the stored
+    timestamp. Returns None if the file doesn't exist (first run).
+
+    Returns
+    -------
+    datetime or None
+        The last processed timestamp, or None if not found.
+    """
     try:
         response = s3_client.get_object(
             Bucket=S3_BUCKET, Key="last_checked.json"

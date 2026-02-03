@@ -1,3 +1,31 @@
+"""
+Configuration and Logging Module
+=================================
+
+This module provides application configuration, AWS client setup, and
+logging configuration for the Amtrak Ingestion system.
+
+Attributes
+----------
+s3_client : boto3.client
+    Configured S3 client for AWS operations.
+AMTRAK_ENABLED : bool
+    Flag to enable/disable Amtrak data processing.
+VIA_ENABLED : bool
+    Flag to enable/disable VIA Rail data processing.
+BRIGHTLINE_ENABLED : bool
+    Flag to enable/disable Brightline data processing.
+ENVIRONMENT : str
+    Current environment (PROD or DEV).
+
+Functions
+---------
+setup_logging
+    Configure application logging.
+get_logger
+    Get a logger instance for a module.
+"""
+
 import boto3
 import os
 import logging

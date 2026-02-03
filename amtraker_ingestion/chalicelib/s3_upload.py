@@ -1,3 +1,20 @@
+"""
+S3 Upload and Download Module
+==============================
+
+This module handles all interactions with AWS S3 for data storage and
+retrieval, including compression and decompression of files.
+
+Main Functions
+--------------
+get_s3_json
+    Download and parse a JSON file from S3
+set_s3_json
+    Upload a Python dict as JSON to S3
+upload_todays_events_to_s3
+    Upload all event files for today's service date
+"""
+
 from datetime import date, datetime, timedelta
 import glob
 from chalicelib.config import s3_client, get_logger
@@ -19,7 +36,24 @@ logger = get_logger(__name__)
 
 def get_s3_json(bucket_name: str, key: str) -> dict:
     """
-    Downloads a JSON file from S3 and returns it as a dict.
+    Download and parse a JSON file from S3.
+
+    Parameters
+    ----------
+    bucket_name : str
+        Name of the S3 bucket.
+    key : str
+        S3 object key (path to the file).
+
+    Returns
+    -------
+    dict
+        Parsed JSON content as a Python dictionary.
+
+    Raises
+    ------
+    Exception
+        If download fails or JSON parsing fails.
     """
     logger.debug(f"Downloading JSON from S3: s3://{bucket_name}/{key}")
     try:
@@ -38,7 +72,21 @@ def get_s3_json(bucket_name: str, key: str) -> dict:
 
 def set_s3_json(data: dict, bucket_name: str, key: str):
     """
-    Uploads a Python dict as a JSON file to S3.
+    Upload a Python dictionary as a JSON file to S3.
+
+    Parameters
+    ----------
+    data : dict
+        Python dictionary to serialize as JSON.
+    bucket_name : str
+        Name of the S3 bucket.
+    key : str
+        S3 object key (path for the file).
+
+    Raises
+    ------
+    Exception
+        If upload fails.
     """
     logger.debug(f"Uploading JSON to S3: s3://{bucket_name}/{key}")
 
