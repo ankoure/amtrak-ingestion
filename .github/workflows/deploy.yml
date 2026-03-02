@@ -45,3 +45,18 @@ jobs:
       - name: Deploy to AWS
         working-directory: amtraker_ingestion
         run: uv run chalice deploy --stage dev
+
+      - name: Attach Lambda layer with native dependencies
+        env:
+          LAYER_ARN: arn:aws:lambda:us-east-1:081194948292:layer:amtraker-ingestion-deps:1
+        run: |
+          for func in \
+            "amtraker-ingestion-dev-update_gtfs_cache" \
+            "amtraker-ingestion-dev-consume_amtraker_api" \
+            "amtraker-ingestion-dev-collate_previous_day" \
+            "amtraker-ingestion-dev"; do
+            aws lambda update-function-configuration \
+              --function-name "$func" \
+              --layers "$LAYER_ARN" \
+              --no-cli-pager > /dev/null 2>&1 && echo "Layer attached to $func" || echo "Skipped $func (not found)"
+          done
