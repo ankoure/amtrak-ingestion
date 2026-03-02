@@ -41,7 +41,7 @@
     "prod": {
       "api_gateway_stage": "api",
       "autogen_policy": false,
-      "iam_policy_file": "policy-lamp-ingest.json",
+      "iam_policy_file": "policy-amtraker-ingest.json",
       "lambda_memory_size": 2048,
       "lambda_timeout": 900,
       "tags": {
@@ -57,17 +57,17 @@
       },
       "lambda_functions": {
         "update_gtfs_cache": {
-          "iam_policy_file": "policy-lamp-ingest.json",
+          "iam_policy_file": "policy-amtraker-ingest.json",
           "lambda_timeout": 900,
           "lambda_memory_size": 2048
         },
         "consume_amtraker_api": {
-          "iam_policy_file": "policy-lamp-ingest.json",
+          "iam_policy_file": "policy-amtraker-ingest.json",
           "lambda_timeout": 900,
           "lambda_memory_size": 2048
         },
         "collate_previous_day": {
-          "iam_policy_file": "policy-lamp-ingest.json",
+          "iam_policy_file": "policy-amtraker-ingest.json",
           "lambda_timeout": 900,
           "lambda_memory_size": 2048
         }

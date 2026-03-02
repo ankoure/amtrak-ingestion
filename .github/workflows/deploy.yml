@@ -38,10 +38,10 @@ jobs:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
         run: |
           jq --arg key "$DD_API_KEY" \
-            '.stages.prod.environment_variables.DD_API_KEY = $key' \
+            '.stages.dev.environment_variables.DD_API_KEY = $key' \
             .chalice/config.json > .chalice/config.tmp.json
           mv .chalice/config.tmp.json .chalice/config.json
 
       - name: Deploy to AWS
         working-directory: amtraker_ingestion
-        run: uv run chalice deploy --stage prod
+        run: uv run chalice deploy --stage dev
