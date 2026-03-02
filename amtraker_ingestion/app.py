@@ -26,8 +26,8 @@ def index():
     return {"hello": "world"}
 
 
-@app.schedule(Cron(0, 2, "*", "*", "?", "*"))
 @datadog_lambda_wrapper
+@app.schedule(Cron(0, 2, "*", "*", "?", "*"))
 def update_gtfs_cache(event):
     """
     Scheduled function to check for and update GTFS bundles in S3
@@ -70,8 +70,8 @@ def manual_gtfs_update():
         raise
 
 
-@app.schedule(Cron("*/5", "*", "*", "*", "?", "*"))
 @datadog_lambda_wrapper
+@app.schedule(Cron("*/5", "*", "*", "*", "?", "*"))
 def consume_amtraker_api(event):
     """
     Scheduled function to fetch train data from Amtraker API
@@ -116,8 +116,8 @@ def manual_amtraker_update():
         raise
 
 
-@app.schedule(Cron(0, 3, "*", "*", "?", "*"))
 @datadog_lambda_wrapper
+@app.schedule(Cron(0, 3, "*", "*", "?", "*"))
 def collate_previous_day(event):
     """
     Scheduled function to collate previous day's data for all providers
