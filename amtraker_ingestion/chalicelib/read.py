@@ -19,7 +19,7 @@ Pipeline Steps
 
 from chalicelib.timefilter import filter_events
 from chalicelib.models.amtraker import TrainResponse
-from chalicelib.config import get_logger
+from chalicelib.config import get_logger, lambda_metric, get_dd_tags
 import requests
 from pydantic import ValidationError
 from chalicelib.constants import AMTRAKER_API
@@ -91,6 +91,15 @@ def validate_amtraker_data(amtraker_api_url: str) -> TrainResponse:
             f"{train_count} trains found"
         )
 
+        tags = get_dd_tags()
+        lambda_metric(
+            "pipeline.api.request_duration_seconds",
+            request_duration,
+            tags=tags,
+        )
+        lambda_metric("pipeline.api.response_bytes", response_size, tags=tags)
+        lambda_metric("pipeline.api.trains_fetched", train_count, tags=tags)
+
         return validated_data
 
     except requests.RequestException as e:
@@ -98,12 +107,14 @@ def validate_amtraker_data(amtraker_api_url: str) -> TrainResponse:
             f"HTTP request failed after {time.time() - start_time:.2f}s: {e}",
             exc_info=True,
         )
+        lambda_metric("pipeline.api.request_failures", 1, tags=get_dd_tags())
         raise
     except ValidationError as e:
         logger.error(
             f"Validation error while processing Amtraker data: {e}",
             exc_info=True,
         )
+        lambda_metric("pipeline.api.validation_errors", 1, tags=get_dd_tags())
         raise
 
 
@@ -276,6 +287,16 @@ def read_amtraker_data() -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
         f"Input: {len(df)} rows, Output: {len(remove_bus_df)} rows "
         f"(Amtrak: {len(amtrak_df)}, Via: {len(via_df)}, "
         f"Brightline: {len(brightline_df)})"
+    )
+
+    tags = get_dd_tags()
+    lambda_metric(
+        "pipeline.read.rows_after_time_filter", len(time_filter), tags=tags
+    )
+    lambda_metric(
+        "pipeline.read.rows_after_bus_removal",
+        len(remove_bus_df),
+        tags=tags,
     )
 
     return amtrak_df, via_df, brightline_df

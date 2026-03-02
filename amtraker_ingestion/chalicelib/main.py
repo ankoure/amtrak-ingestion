@@ -44,6 +44,8 @@ from chalicelib.config import (
     BRIGHTLINE_ENABLED,
     ENVIRONMENT,
     get_logger,
+    lambda_metric,
+    get_dd_tags,
 )
 from chalicelib.s3_upload import (
     get_s3_json,
@@ -141,7 +143,9 @@ def generate_event_data():
                 logger.debug(f"Using cached Amtrak GTFS: {amtrak_gtfs_dir}")
 
             # Enrich with direction_id and scheduled metrics
-            enriched_amtrak = add_direction_id(amtrak_df, amtrak_gtfs_dir)
+            enriched_amtrak = add_direction_id(
+                amtrak_df, amtrak_gtfs_dir, provider="amtrak"
+            )
             enriched_amtrak = add_scheduled_metrics(
                 enriched_amtrak, amtrak_gtfs_dir
             )
@@ -155,6 +159,11 @@ def generate_event_data():
             logger.info(
                 f"Amtrak processing completed in {provider_duration:.2f}s - "
                 f"{len(enriched_amtrak)} events"
+            )
+            lambda_metric(
+                "pipeline.run.provider_duration_seconds",
+                provider_duration,
+                tags=get_dd_tags(provider="amtrak"),
             )
 
         if via:
@@ -171,7 +180,9 @@ def generate_event_data():
                 logger.debug(f"Using cached Via Rail GTFS: {via_gtfs_dir}")
 
             # Via Rail
-            enriched_via = add_direction_id(via_df, via_gtfs_dir)
+            enriched_via = add_direction_id(
+                via_df, via_gtfs_dir, provider="via"
+            )
             enriched_via = add_scheduled_metrics(enriched_via, via_gtfs_dir)
             # Add service dates
             enriched_via = add_service_dates(enriched_via)
@@ -182,6 +193,11 @@ def generate_event_data():
             logger.info(
                 f"Via Rail processing completed in {provider_duration:.2f}s - "
                 f"{len(enriched_via)} events"
+            )
+            lambda_metric(
+                "pipeline.run.provider_duration_seconds",
+                provider_duration,
+                tags=get_dd_tags(provider="via"),
             )
 
         if brightline:
@@ -221,6 +237,11 @@ def generate_event_data():
                 f"Brightline processing completed in {provider_duration:.2f}s - "
                 f"{len(enriched_brightline)} events"
             )
+            lambda_metric(
+                "pipeline.run.provider_duration_seconds",
+                provider_duration,
+                tags=get_dd_tags(provider="brightline"),
+            )
 
         if ENVIRONMENT == "PROD":
             set_last_processed()
@@ -232,6 +253,11 @@ def generate_event_data():
         total_duration = time.time() - start_time
         logger.info(
             f"Event data generation completed successfully in {total_duration:.2f}s"
+        )
+        lambda_metric(
+            "pipeline.run.total_duration_seconds",
+            total_duration,
+            tags=get_dd_tags(),
         )
 
     except Exception as e:
@@ -384,6 +410,13 @@ def check_gtfs_bundle_loop():
         f"GTFS bundle check completed in {total_duration:.2f}s - "
         f"{downloads_count} bundle(s) downloaded"
     )
+    tags = get_dd_tags()
+    lambda_metric(
+        "pipeline.gtfs.bundles_downloaded", downloads_count, tags=tags
+    )
+    lambda_metric(
+        "pipeline.gtfs.check_duration_seconds", total_duration, tags=tags
+    )
 
 
 def collate_amtraker_data_for_date(
@@ -447,6 +480,11 @@ def collate_amtraker_data_for_date(
             logger.warning(
                 f"No files found for {mode} on {date_str} "
                 f"(checked in {list_duration:.2f}s)"
+            )
+            tags = get_dd_tags(provider=mode_str.lower())
+            lambda_metric("pipeline.collation.raw_files_found", 0, tags=tags)
+            lambda_metric(
+                "pipeline.collation.missing_day_detected", 1, tags=tags
             )
             return all_events
 
@@ -513,6 +551,28 @@ def collate_amtraker_data_for_date(
         logger.info(
             f"Collected {len(all_events)} events from {json_file_count} files "
             f"for {mode} on {date_str} in {process_duration:.2f}s"
+        )
+
+        tags = get_dd_tags(provider=mode_str.lower())
+        lambda_metric(
+            "pipeline.collation.raw_files_found",
+            json_file_count,
+            tags=tags,
+        )
+        lambda_metric(
+            "pipeline.collation.events_from_s3",
+            len(all_events),
+            tags=tags,
+        )
+        lambda_metric(
+            "pipeline.collation.list_duration_seconds",
+            list_duration,
+            tags=tags,
+        )
+        lambda_metric(
+            "pipeline.collation.process_duration_seconds",
+            process_duration,
+            tags=tags,
         )
 
     except Exception as e:
@@ -658,6 +718,17 @@ def collate_amtraker_data(
     logger.info(
         f"Data collation completed in {total_duration:.2f}s - "
         f"{total_events} total events, {total_uploads} files uploaded"
+    )
+
+    tags = get_dd_tags()
+    lambda_metric(
+        "pipeline.collation.total_events_processed", total_events, tags=tags
+    )
+    lambda_metric(
+        "pipeline.collation.files_uploaded", total_uploads, tags=tags
+    )
+    lambda_metric(
+        "pipeline.collation.duration_seconds", total_duration, tags=tags
     )
 
     return {

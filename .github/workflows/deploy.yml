@@ -30,6 +30,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
+      - name: Inject Datadog credentials
+        working-directory: amtraker_ingestion
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+        run: |
+          jq --arg key "$DD_API_KEY" \
+            '.stages.prod.environment_variables.DD_API_KEY = $key' \
+            .chalice/config.json > .chalice/config.tmp.json
+          mv .chalice/config.tmp.json .chalice/config.json
+
       - name: Deploy to AWS
         working-directory: amtraker_ingestion
         run: uv run chalice deploy --stage prod
