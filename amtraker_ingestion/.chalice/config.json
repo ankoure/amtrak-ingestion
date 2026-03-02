@@ -13,6 +13,13 @@
         "service": "mbta-performance",
         "env": "dev"
       },
+      "environment_variables": {
+        "DD_API_KEY": "",
+        "DD_SITE": "datadoghq.com",
+        "DD_ENV": "dev",
+        "DD_SERVICE": "amtrak-ingestion",
+        "DD_FLUSH_TO_LOG": "true"
+      },
       "lambda_functions": {
         "update_gtfs_cache": {
           "iam_policy_file": "policy-amtraker-ingest.json",
@@ -40,6 +47,13 @@
       "tags": {
         "service": "mbta-performance",
         "env": "prod"
+      },
+      "environment_variables": {
+        "DD_API_KEY": "",
+        "DD_SITE": "datadoghq.com",
+        "DD_ENV": "prod",
+        "DD_SERVICE": "amtrak-ingestion",
+        "DD_FLUSH_TO_LOG": "true"
       },
       "lambda_functions": {
         "update_gtfs_cache": {

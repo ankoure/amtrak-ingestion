@@ -17,7 +17,7 @@ upload_todays_events_to_s3
 
 from datetime import date, datetime, timedelta
 import glob
-from chalicelib.config import s3_client, get_logger
+from chalicelib.config import s3_client, get_logger, lambda_metric, get_dd_tags
 from io import BytesIO
 import gzip
 import os
@@ -177,11 +177,26 @@ def _compress_and_upload_file(fp: str):
             f"in {duration:.2f}s"
         )
 
+        tags = get_dd_tags()
+        lambda_metric(
+            "pipeline.s3.upload_duration_seconds", duration, tags=tags
+        )
+        lambda_metric("pipeline.s3.original_bytes", original_size, tags=tags)
+        lambda_metric(
+            "pipeline.s3.compressed_bytes", compressed_size, tags=tags
+        )
+        lambda_metric(
+            "pipeline.s3.compression_ratio_pct",
+            compression_ratio,
+            tags=tags,
+        )
+
     except Exception as e:
         logger.error(
             f"Failed to compress and upload {fp} to s3://{S3_BUCKET}/{s3_key}: {e}",
             exc_info=True,
         )
+        lambda_metric("pipeline.s3.upload_failures", 1, tags=get_dd_tags())
         raise
 
 

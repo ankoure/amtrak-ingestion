@@ -17,12 +17,14 @@ import polars as pl
 import time
 
 from chalicelib.gtfs import generate_direction_lookup, calculate_gtfs_metrics
-from chalicelib.config import get_logger
+from chalicelib.config import get_logger, lambda_metric, get_dd_tags
 
 logger = get_logger(__name__)
 
 
-def add_direction_id(amtraker_df: pl.DataFrame, gtfs_dir: str) -> pl.DataFrame:
+def add_direction_id(
+    amtraker_df: pl.DataFrame, gtfs_dir: str, provider: str = "unknown"
+) -> pl.DataFrame:
     """
     Enrich Amtraker train data with GTFS direction IDs.
 
@@ -122,13 +124,30 @@ def add_direction_id(amtraker_df: pl.DataFrame, gtfs_dir: str) -> pl.DataFrame:
         ["direction_id_primary", "direction_id_secondary"]
     )
 
+    match_rate = 100 * (primary_hits + secondary_hits) / input_rows
     duration = time.time() - start_time
     logger.info(
         f"Direction ID lookup completed in {duration:.2f}s - "
         f"Primary: {primary_hits}, Secondary: {secondary_hits}, "
         f"Misses: {misses} "
-        f"({100 * (primary_hits + secondary_hits) / input_rows:.1f}% "
-        f"match rate)"
+        f"({match_rate:.1f}% match rate)"
+    )
+
+    tags = get_dd_tags(provider=provider)
+    lambda_metric(
+        "pipeline.gtfs.direction_id_match_rate_pct", match_rate, tags=tags
+    )
+    lambda_metric(
+        "pipeline.gtfs.direction_id_primary_hits", primary_hits, tags=tags
+    )
+    lambda_metric(
+        "pipeline.gtfs.direction_id_secondary_hits",
+        secondary_hits,
+        tags=tags,
+    )
+    lambda_metric("pipeline.gtfs.direction_id_misses", misses, tags=tags)
+    lambda_metric(
+        "pipeline.gtfs.enrichment_duration_seconds", duration, tags=tags
     )
 
     return df_enriched

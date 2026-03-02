@@ -8,6 +8,14 @@ from chalicelib.constants import Provider
 from chalicelib.config import get_logger
 import time
 
+try:
+    from datadog_lambda.wrapper import datadog_lambda_wrapper
+except ImportError:
+
+    def datadog_lambda_wrapper(fn):  # type: ignore[misc]
+        return fn
+
+
 app = Chalice(app_name="amtrak-ingestion")
 logger = get_logger(__name__)
 
@@ -19,6 +27,7 @@ def index():
 
 
 @app.schedule(Cron(0, 2, "*", "*", "?", "*"))
+@datadog_lambda_wrapper
 def update_gtfs_cache(event):
     """
     Scheduled function to check for and update GTFS bundles in S3
@@ -62,6 +71,7 @@ def manual_gtfs_update():
 
 
 @app.schedule(Cron("*/5", "*", "*", "*", "?", "*"))
+@datadog_lambda_wrapper
 def consume_amtraker_api(event):
     """
     Scheduled function to fetch train data from Amtraker API
@@ -107,6 +117,7 @@ def manual_amtraker_update():
 
 
 @app.schedule(Cron(0, 3, "*", "*", "?", "*"))
+@datadog_lambda_wrapper
 def collate_previous_day(event):
     """
     Scheduled function to collate previous day's data for all providers

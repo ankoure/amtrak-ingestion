@@ -27,6 +27,7 @@ get_logger
 """
 
 import boto3
+import json
 import os
 import logging
 import sys
@@ -55,12 +56,31 @@ VIA_ENABLED = True
 BRIGHTLINE_ENABLED = False
 ENVIRONMENT = "PROD"
 
+_FUNCTION_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "local")
+
+
+class JSONFormatter(logging.Formatter):
+    """JSON log formatter for structured Datadog log ingestion."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        log_record: dict = {
+            "timestamp": self.formatTime(record, datefmt="%Y-%m-%dT%H:%M:%S"),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "function_name": _FUNCTION_NAME,
+            "env": ENVIRONMENT.lower(),
+        }
+        if record.exc_info:
+            log_record["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_record)
+
 
 # Logging Configuration
 def setup_logging():
     """
     Configure logging for the application.
-    CloudWatch-friendly format that includes timestamp, level, module, and structured data.
+    Emits JSON-structured logs compatible with Datadog log ingestion via Forwarder.
     """
     log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
 
@@ -79,13 +99,7 @@ def setup_logging():
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(getattr(logging, log_level, logging.INFO))
 
-    # CloudWatch-friendly format with structured data support
-    # Format: timestamp - level - logger_name - message - extra_fields
-    formatter = logging.Formatter(
-        fmt="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    handler.setFormatter(formatter)
+    handler.setFormatter(JSONFormatter())
 
     # Add handler to root logger
     root_logger.addHandler(handler)
@@ -113,3 +127,39 @@ def get_logger(name: str) -> logging.Logger:
         Logger instance configured with the application settings
     """
     return logging.getLogger(name)
+
+
+# Datadog metrics helpers
+try:
+    from datadog_lambda.metric import lambda_metric as _lambda_metric
+
+    def lambda_metric(
+        metric_name: str,
+        value: float,
+        tags: list[str] | None = None,
+    ) -> None:
+        _lambda_metric(metric_name, value, tags=tags or [])
+
+except ImportError:
+
+    def lambda_metric(  # type: ignore[misc]
+        metric_name: str,
+        value: float,
+        tags: list[str] | None = None,
+    ) -> None:
+        pass
+
+
+def get_dd_tags(
+    provider: str | None = None,
+    function_name: str | None = None,
+) -> list[str]:
+    """Return standard Datadog tags for a metric emission."""
+    tags = [
+        f"env:{ENVIRONMENT.lower()}",
+        "service:amtrak-ingestion",
+        f"function_name:{function_name or _FUNCTION_NAME}",
+    ]
+    if provider:
+        tags.append(f"provider:{provider.lower()}")
+    return tags
